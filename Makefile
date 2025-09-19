@@ -1,6 +1,10 @@
 CC = gcc
 IFLAGS = -I$(IDIR) -I$(LDIR)
-LFLAGS = -L$(LDIR)
+ifeq ($(wildcard $(LDIR)),)
+  LFLAGS :=
+else
+  LFLAGS = -L$(LDIR)
+endif
 
 SRCDIR = src
 IDIR = include
