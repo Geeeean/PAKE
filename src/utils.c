@@ -8,7 +8,11 @@ int sum(const int a, const int b)
 }
 
 
-int H_function(char* password, char* id_client, char* id_server, unsigned char output0[32], unsigned char output1[32]) {
+int H_function(const unsigned char* password, const unsigned char* id_client, 
+                const unsigned char* id_server, unsigned char output0[32], 
+                unsigned char output1[32]) {
+    
+    // https://libsodium.gitbook.io/doc/advanced/sha-2_hash_function
     unsigned char hash[crypto_hash_sha512_BYTES];
     crypto_hash_sha512_state state;
     crypto_hash_sha512_init(&state);
@@ -19,15 +23,21 @@ int H_function(char* password, char* id_client, char* id_server, unsigned char o
 
     crypto_hash_sha512_final(&state, hash);
     
-    // To do - Need converting part
-    memcpy(output0, hash, 32);
-    memcpy(output1, hash + 32, 32);
+    // https://libsodium.gitbook.io/doc/advanced/point-arithmetic/ristretto
+    crypto_core_ristretto255_scalar_reduce(output0, hash);
+    crypto_core_ristretto255_scalar_reduce(output1, hash + 32);
+
+    // https://libsodium.gitbook.io/doc/memory_management (PARANOIA)
+    sodium_memzero(hash, sizeof(hash));
     return 0;
 }
 
-int H_prime_function(const input, const len, unsigned char out[32]) {
-    unsigned char hash[crypto_hash_sha512_BYTES];
-    crypto_hash_sha512(hash, input, len);
-    memcpy(out, hash, 32);
-    return 0;
-}
+// int H_prime_function(const input, const len, unsigned char out[32]) {
+//     unsigned char hash[crypto_hash_sha512_BYTES];
+
+//     crypto_hash_sha512(hash, input, len);
+//     memcpy(out, hash, 32);
+
+//     sodium_memzero(hash, sizeof(hash));
+//     return 0;
+// }
