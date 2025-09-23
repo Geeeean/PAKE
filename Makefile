@@ -1,37 +1,55 @@
 CC = gcc
-IFLAGS = -I$(IDIR) -I$(LDIR)
-ifeq ($(wildcard $(LDIR)),)
-  LFLAGS :=
-else
-  LFLAGS = -L$(LDIR)
-endif
 
-SRCDIR = src
-IDIR = include
-BUILDDIR = build
-BINDIR = bin
-LDIR = lib
-LIBS = libsodium.a
-LLIBS := $(patsubst lib%.a,-l%,$(LIBS)) 
+SOURCEDIR  = src
+BUILDDIR   = build
+BINDIR     = bin
+INCLUDEDIR = include
 
-TARGET = pake
+CLIENT = client
+SERVER = server
+CORE   = core
 
-LOCAL_DEPS := $(wildcard $(IDIR)/*.h)
-LIB_DEPS := $(wildcard $(LDIR)/*/*.h)
-DEPS := $(LOCAL_DEPS) $(LIB_DEPS)
+CORE_IFLAGS   = -I$(INCLUDEDIR)/$(CORE)
+CLIENT_IFLAGS = -I$(INCLUDEDIR)/$(CLIENT) $(CORE_IFLAGS)
+SERVER_IFLAGS = -I$(INCLUDEDIR)/$(SERVER) $(CORE_IFLAGS)
 
-LOCAL_SOURCES := $(wildcard $(SRCDIR)/*.c)
-LIB_SOURCES := $(wildcard $(LDIR)/*/*.c)
-SOURCES := $(LOCAL_SOURCES) $(LIB_SOURCES)
-OBJ = $(patsubst %.c,$(BUILDDIR)/%.o, $(SOURCES))
+CLIENT_SOURCES := $(wildcard $(SOURCEDIR)/$(CLIENT)/*.c) $(wildcard $(SOURCEDIR)/$(CORE)/*.c)
+SERVER_SOURCES := $(wildcard $(SOURCEDIR)/$(SERVER)/*.c) $(wildcard $(SOURCEDIR)/$(CORE)/*.c)
+CLIENT_OBJS := $(patsubst $(SOURCEDIR)/%.c, $(BUILDDIR)/%.o, $(CLIENT_SOURCES))
+SERVER_OBJS := $(patsubst $(SOURCEDIR)/%.c, $(BUILDDIR)/%.o, $(SERVER_SOURCES))
 
-$(TARGET): $(OBJ)
-	@mkdir -p $(BINDIR)
-	$(CC) -o $(BINDIR)/$@ $^ $(LFLAGS) $(LLIBS)
+LIBS = sodium
+LLIBS := $(patsubst %,-l%,$(LIBS))
 
-$(BUILDDIR)/%.o: %.c $(DEPS)
-	@ mkdir -p $(dir $@)
-	$(CC) -c -o $@ $< $(IFLAGS)
+all: $(CLIENT) $(SERVER)
+
+$(CLIENT): $(BINDIR)/$(CLIENT)
+$(SERVER): $(BINDIR)/$(SERVER)
+
+# Client objs
+$(BUILDDIR)/$(CLIENT)/%.o: $(SOURCEDIR)/$(CLIENT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c -o $@ $< $(CLIENT_IFLAGS)
+
+# Server objs
+$(BUILDDIR)/$(SERVER)/%.o: $(SOURCEDIR)/$(SERVER)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c -o $@ $< $(SERVER_IFLAGS)
+
+# Core objs
+$(BUILDDIR)/$(CORE)/%.o: $(SOURCEDIR)/$(CORE)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c -o $@ $< $(CORE_IFLAGS)
+
+# Client bin
+$(BINDIR)/$(CLIENT): $(CLIENT_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) -o $@ $^ $(LFLAGS) $(LLIBS)
+
+# Server bin
+$(BINDIR)/$(SERVER): $(SERVER_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) -o $@ $^ $(LFLAGS) $(LLIBS)
 
 .PHONY: clean
 
