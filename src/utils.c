@@ -24,8 +24,9 @@ int H_function(const unsigned char* password, const unsigned char* id_client,
     crypto_hash_sha512_final(&state, hash);
     
     // https://libsodium.gitbook.io/doc/advanced/point-arithmetic/ristretto
-    crypto_core_ristretto255_from_hash(output0, hash);
-    crypto_core_ristretto255_from_hash(output1, hash + 32);
+    // I have to check if this is the correct way
+    crypto_core_ristretto255_scalar_reduce(output0, hash);
+    crypto_core_ristretto255_scalar_reduce(output1, hash + 32);
 
     // https://libsodium.gitbook.io/doc/memory_management (PARANOIA)
     sodium_memzero(hash, sizeof(hash));
