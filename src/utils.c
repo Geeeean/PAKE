@@ -23,13 +23,20 @@ int H_function(const unsigned char* password, const unsigned char* id_client,
 
     crypto_hash_sha512_final(&state, hash);
     
+    // 512 bits to two bitstrings of length 256 bits + padding
+    unsigned char buffer0[crypto_hash_sha512_BYTES] = {0};
+    memcpy(buffer0, hash, crypto_core_ristretto255_BYTES);
+    unsigned char buffer1[crypto_hash_sha512_BYTES] = {0};
+    memcpy(buffer0, hash + crypto_core_ristretto255_BYTES, crypto_core_ristretto255_BYTES);
+    sodium_memzero(hash, sizeof(hash));
+
     // https://libsodium.gitbook.io/doc/advanced/point-arithmetic/ristretto
     // I have to check if this is the correct way
-    crypto_core_ristretto255_scalar_reduce(output0, hash);
-    crypto_core_ristretto255_scalar_reduce(output1, hash + 32);
+    crypto_core_ristretto255_scalar_reduce(output0, buffer0);
+    sodium_memzero(buffer0, sizeof(buffer0));
+    crypto_core_ristretto255_scalar_reduce(output1, buffer1);
+    sodium_memzero(buffer1, sizeof(buffer1));
 
-    // https://libsodium.gitbook.io/doc/memory_management (PARANOIA)
-    sodium_memzero(hash, sizeof(hash));
     return 0;
 }
 
