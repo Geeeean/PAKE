@@ -11,8 +11,8 @@ IDIR = include
 BUILDDIR = build
 BINDIR = bin
 LDIR = lib
-LIBS = libsodium.a
-LLIBS := $(patsubst lib%.a,-l%,$(LIBS)) 
+LIBS = sodium
+LLIBS := $(patsubst %,-l%,$(LIBS)) 
 
 TARGET = pake
 
