@@ -1,8 +1,14 @@
-#include <errno.h>
-#include <netinet/in.h>
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <errno.h>
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+#endif
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 
 int main()
 {
@@ -21,9 +27,12 @@ int main()
 
     /*** OPTIONS ***/
     int opt = 1;
-    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
-                   sizeof(opt))) {
-        fprintf(stderr, "Error while setting socket options: %s\n", strerror(errno));
+    #ifdef _WIN32
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt)) < 0) {
+    #else
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    #endif
+        fprintf(stderr, "Error while setting socket options\n");
         result = 1;
         goto cleanup;
     }

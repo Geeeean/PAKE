@@ -27,4 +27,25 @@ int main()
         printf("%02x", phi1[i]);
     }
     printf("\n");
+
+    unsigned char k[32];
+    unsigned char u[crypto_core_ristretto255_BYTES];
+    unsigned char v[crypto_core_ristretto255_BYTES];
+    unsigned char w[crypto_core_ristretto255_BYTES];
+    unsigned char d[crypto_core_ristretto255_SCALARBYTES];
+
+    H_prime(phi0, sizeof(phi0),
+            id_client, strlen((const char*)id_client),
+            id_server, strlen((const char*)id_server),
+            u, sizeof(u),
+            v, sizeof(v),
+            w, sizeof(w),
+            d, sizeof(d),
+            k);
+
+    printf("k (H'): ");
+    for (size_t i = 0; i < sizeof(k); i++) printf("%02x", k[i]);
+    printf("\n");
+
+    return 0;
 }
