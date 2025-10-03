@@ -7,7 +7,6 @@ int sum(const int a, const int b)
     return a + b;
 }
 
-
 int H_function(const unsigned char* password, const unsigned char* id_client, 
                 const unsigned char* id_server, unsigned char output0[crypto_core_ristretto255_BYTES], 
                 unsigned char output1[crypto_core_ristretto255_BYTES]) {

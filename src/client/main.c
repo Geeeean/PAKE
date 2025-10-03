@@ -5,9 +5,11 @@
 int main()
 {
     printf("Hello from client\n");
+    
     if (sodium_init() == -1) {
         return 1;
     }
+
     const unsigned char* password = "pass123";
     const unsigned char* id_client = "jakobkjellberg02";
     const unsigned char* id_server = "dtu.dk";
