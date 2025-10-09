@@ -3,11 +3,8 @@
 
 #include "sodium.h"
 
-#include <errno.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
 int main()
@@ -17,17 +14,17 @@ int main()
     }
 
     int result = 0;
-    int socket_fd = get_socket();
+    int socket_fd = nw_get_socket();
 
     /*** SOCKET ***/
     if (socket_fd < 0) {
-        fprintf(stderr, "Error while creating the socket: %s\n", strerror(errno));
+        fprintf(stderr, "Error while creating the socket\n");
         result = 1;
         goto cleanup;
     }
 
     /*** ADDRESS ***/
-    struct sockaddr_in address = get_address();
+    struct sockaddr_in address = nw_get_address();
 
     if (connect(socket_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Connection Failed");
