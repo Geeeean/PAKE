@@ -1,4 +1,5 @@
 #include "network.h"
+#include "server/network.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -41,24 +42,19 @@ int main()
     }
 
     /*** MAIN LOOP ***/
-    struct sockaddr client_address;
-    socklen_t socklen = sizeof(client_address);
-    int new_socket =
-        accept(listen_socket_fd, (struct sockaddr *)&client_address, &socklen);
+    while (1) {
+        struct sockaddr client_address;
+        socklen_t socklen = sizeof(client_address);
+        int new_socket =
+            accept(listen_socket_fd, (struct sockaddr *)&client_address, &socklen);
 
-    if (new_socket < 0) {
-        goto cleanup;
+        if (new_socket < 0) {
+            goto cleanup;
+        }
+
+        const Connection connection = {.socket = new_socket};
+        sn_handle_connection(connection);
     }
-
-    char buffer[1024];
-    ssize_t valread = read(new_socket, buffer, sizeof(buffer) - 1);
-
-    printf("%s\n", buffer);
-
-    char *hello = "Helloooooooooo!";
-
-    send(new_socket, hello, strlen(hello), 0);
-    printf("Hello message sent\n");
 
 cleanup:
     close(listen_socket_fd);

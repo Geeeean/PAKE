@@ -1,3 +1,4 @@
+#include "log.h"
 #include "network.h"
 #include "utils.h"
 
@@ -31,12 +32,28 @@ int main()
         return 1;
     }
 
-    char *msg = "Hello from client!";
-    send(socket_fd, msg, strlen(msg), 0);
+    for (int i = 0; i < 3; i++) {
+        char *msg;
+        asprintf(&msg, "Message %d", i);
 
-    char buffer[1024] = {0};
-    read(socket_fd, buffer, sizeof(buffer) - 1);
-    printf("msg from server: %s\n", buffer);
+        LOG_INFO("Sending %s to server", msg);
+        send(socket_fd, msg, strlen(msg) + 1, 0);
+
+        // char buffer[1024] = {0};
+        // read(socket_fd, buffer, sizeof(buffer));
+        // printf("msg from server: %s\n", buffer);
+
+        free(msg);
+
+        sleep(3);
+    }
+
+    char *msg = "END";
+    send(socket_fd, msg, strlen(msg) + 1, 0);
+    LOG_INFO("Sending %s to server for finishing comunication", msg);
+
+    /*** CLIENT PAKE ***/
+    goto cleanup; // to be removed -------------------------------
 
     const unsigned char *password = "pass123";
     const unsigned char *id_client = "jakobkjellberg02";

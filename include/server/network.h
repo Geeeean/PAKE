@@ -1,5 +1,5 @@
-#ifndef NETWORK_H
-#define NETWORK_H
+#ifndef SERVER_NETWORK_H
+#define SERVER_NETWORK_H
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -12,8 +12,10 @@
 #include <sys/socket.h>
 #endif
 
-int nw_get_socket();
-struct sockaddr_in nw_get_address();
-int nw_set_socket_reuse(int socket_fd);
+typedef struct {
+    int socket;
+} Connection;
+
+void sn_handle_connection(const Connection connection);
 
 #endif
