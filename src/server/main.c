@@ -1,25 +1,33 @@
+#include "network.h"
+
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+
 #else
-    #include <errno.h>
-    #include <netinet/in.h>
-    #include <sys/socket.h>
+
+#include <errno.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
 #endif
+
+#include <errno.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 int main()
 {
-    printf("Hello from server\n");
-    return 0;
-
     int result = 0;
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int listen_socket_fd = get_socket();
 
     /*** SOCKET ***/
-    if (socket_fd < 0) {
+    if (listen_socket_fd < 0) {
         fprintf(stderr, "Error while creating the socket: %s\n", strerror(errno));
         result = 1;
         goto cleanup;
@@ -27,24 +35,55 @@ int main()
 
     /*** OPTIONS ***/
     int opt = 1;
-    #ifdef _WIN32
-        if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt)) < 0) {
-    #else
-        if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-    #endif
+#ifdef _WIN32
+    if (setsockopt(listen_socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt,
+                   sizeof(opt)) < 0) {
+#else
+    if (setsockopt(listen_socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+#endif
         fprintf(stderr, "Error while setting socket options\n");
         result = 1;
         goto cleanup;
     }
 
     /*** ADDRESS ***/
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
+    struct sockaddr_in address = get_address();
 
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    server_addr.sin_port = htons(8080);
+    /*** BINDING ***/
+    if (bind(listen_socket_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        result = 3;
+        fprintf(stderr, "Error while binding socket to addr: %s\n", strerror(errno));
+        goto cleanup;
+    }
+
+    if (listen(listen_socket_fd, 3) < 0) {
+        result = 4;
+        fprintf(stderr, "Error while setting socket for listening: %s\n",
+                strerror(errno));
+        goto cleanup;
+    }
+
+    /*** MAIN LOOP ***/
+    struct sockaddr client_address;
+    socklen_t socklen = sizeof(client_address);
+    int new_socket =
+        accept(listen_socket_fd, (struct sockaddr *)&client_address, &socklen);
+
+    if (new_socket < 0) {
+        goto cleanup;
+    }
+
+    char buffer[1024];
+    ssize_t valread = read(new_socket, buffer, sizeof(buffer) - 1);
+
+    printf("%s\n", buffer);
+
+    char *hello = "Helloooooooooo!";
+
+    send(new_socket, hello, strlen(hello), 0);
+    printf("Hello message sent\n");
 
 cleanup:
+    close(listen_socket_fd);
     return result;
 }
