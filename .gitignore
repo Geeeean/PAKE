@@ -1,5 +1,6 @@
 build
 bin
 compile_commands.json
+.clangd
 .cache
 .vscode/c_cpp_properties.json
