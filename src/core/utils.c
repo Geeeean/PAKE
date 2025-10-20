@@ -166,9 +166,7 @@ int compute_w_d_values_for_client(const unsigned char alpha[crypto_core_ristrett
     if (!alpha || !b || !v || !phi0 || !phi1) return -1;
     
     unsigned char b_phi0[crypto_core_ristretto255_BYTES];
-    if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) {
-        return -1;
-    }
+    if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) return -1;
     unsigned char v_b_phi0[crypto_core_ristretto255_BYTES];
     crypto_core_ristretto255_sub(v_b_phi0, v, b_phi0);
 
