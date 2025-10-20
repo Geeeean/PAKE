@@ -7,11 +7,6 @@
 #define HASH_INPUT_A "pake_ristretto_a"
 #define HASH_INPUT_B "pake_ristretto_b"
 
-int sum(const int a, const int b)
-{
-    return a + b;
-}
-
 /***********************************************
  *  Generating static group elements a and b
  *  @param a   32 byte scalar

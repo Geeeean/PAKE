@@ -10,13 +10,15 @@ static void *handle_client(void *args)
     const Connection *connection = (const Connection *)args;
     int socket = connection->socket;
 
-    char buffer[1024];
-    while (read(socket, buffer, sizeof(buffer)) > 0) {
-        printf("READ FROM CLIENT %d: %s\n", socket, buffer);
-        if (strcmp(buffer, "END") == 0) {
-            break;
-        }
-    }
+    // printf("ACCEPTED CONNECTION WITH CLIENT: %d\n", socket);
+
+    // char buffer[1024];
+    // while (read(socket, buffer, sizeof(buffer)) > 0) {
+    //     printf("READ FROM CLIENT %d: %s\n", socket, buffer);
+    //     if (strcmp(buffer, "END") == 0) {
+    //         break;
+    //     }
+    // }
 
     return NULL;
 }
