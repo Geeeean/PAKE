@@ -55,38 +55,60 @@ int main()
     /*** CLIENT PAKE ***/
     goto cleanup; // to be removed -------------------------------
 
+    // TEMP: Our way of getting the public and fixed group elements a,b
+    // Maybe you have a better way Gianluca
+    unsigned char a[crypto_core_ristretto255_BYTES];
+    unsigned char b[crypto_core_ristretto255_BYTES];
+    generate_a_b_group_elements(a, b);
+
+    // TEMP: The client's password for this test and username
+    // and the server's id
     const unsigned char *password = "pass123";
     const unsigned char *id_client = "jakobkjellberg02";
     const unsigned char *id_server = "dtu.dk";
+
+    // (phi0, phi1) <- H(pi||id_client||id_server)
     unsigned char phi0[crypto_core_ristretto255_SCALARBYTES];
     unsigned char phi1[crypto_core_ristretto255_SCALARBYTES];
-
     H_function(password, id_client, id_server, phi0, phi1);
-    printf("phi0: ");
-    for (size_t i = 0; i < sizeof(phi0); i++) {
-        printf("%02x", phi0[i]);
-    }
-    printf("\n");
-    printf("phi1: ");
-    for (size_t i = 0; i < sizeof(phi1); i++) {
-        printf("%02x", phi1[i]);
-    }
-    printf("\n");
 
-    unsigned char k[32];
+    // c <- g^(phi0)
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    crypto_scalarmult_ristretto255_base(c, phi1);
+
+    // Sends phi0 and c to the server
+    // SERVER STUFF GIANLUCA HELP
+    send(socket_fd, phi0, sizeof(phi0), 0);
+    send(socket_fd, c, sizeof(c), 0);
+
+    // alpha <- Z_p
+    unsigned char alpha[crypto_core_ristretto255_SCALARBYTES];
+    crypto_core_ristretto255_scalar_random(alpha);
+    // u = g^(alpha)a^(phi0) 
     unsigned char u[crypto_core_ristretto255_BYTES];
-    unsigned char v[crypto_core_ristretto255_BYTES];
-    unsigned char w[crypto_core_ristretto255_BYTES];
-    unsigned char d[crypto_core_ristretto255_SCALARBYTES];
+    compute_u_value(alpha, a, phi0, u);
 
+    // SERVER STUFF GIANLUCA HELP
+    send(socket_fd, u, sizeof(u), 0);
+
+    // Receiving v 
+    unsigned char v[crypto_core_ristretto255_BYTES];
+    // Need a way to recieve v value from server
+    // Is this the correct way?
+    // SERVER STUFF GIANLUCA HELP
+    recv(socket_fd, v, sizeof(v), 0);
+
+    // w = (v/b^(phi0))^(alpha)
+    // d = (v/b^(phi0))^(phi1)
+    unsigned char w[crypto_core_ristretto255_BYTES];
+    unsigned char d[crypto_core_ristretto255_BYTES];
+    compute_w_d_values_for_client(alpha, b, v, phi0, phi1, w, d);
+
+    // k = H'(phi0||id_client||id_server||u||v||w||d)
+    unsigned char k[32];
     H_prime(phi0, sizeof(phi0), id_client, strlen((const char *)id_client), id_server,
             strlen((const char *)id_server), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
             sizeof(d), k);
-
-    printf("k (H'): ");
-    for (size_t i = 0; i < sizeof(k); i++)
-        printf("%02x", k[i]);
-    printf("\n");
 
 cleanup:
     close(socket_fd);
