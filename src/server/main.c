@@ -1,3 +1,4 @@
+#include "log.h"
 #include "network.h"
 #include "server/client_handler.h"
 
@@ -12,7 +13,7 @@ int main()
 
     /*** SOCKET ***/
     if (listen_socket_fd < 0) {
-        fprintf(stderr, "Error while creating the socket\n");
+        LOG_ERROR("Error while creating the socket");
         result = 1;
         goto cleanup;
     }
@@ -20,8 +21,8 @@ int main()
     /*** OPTIONS ***/
     int opt = 1;
     if (nw_set_socket_reuse(listen_socket_fd)) {
-        fprintf(stderr, "Error while setting socket options\n");
-        result = 1;
+        LOG_ERROR("Error while setting socket options");
+        result = 2;
         goto cleanup;
     }
 
@@ -30,14 +31,14 @@ int main()
 
     /*** BINDING ***/
     if (bind(listen_socket_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        LOG_ERROR("Error while binding socket to addr");
         result = 3;
-        fprintf(stderr, "Error while binding socket to addr\n");
         goto cleanup;
     }
 
     if (listen(listen_socket_fd, 3) < 0) {
+        LOG_ERROR("Error while setting socket for listening");
         result = 4;
-        fprintf(stderr, "Error while setting socket for listening");
         goto cleanup;
     }
 
