@@ -1,5 +1,6 @@
 #include "log.h"
 #include "network.h"
+#include "protocol.h"
 #include "utils.h"
 
 #include "sodium.h"
@@ -8,29 +9,52 @@
 #include <string.h>
 #include <unistd.h>
 
-int main()
+int main(int argc, char *argv[])
 {
     if (sodium_init() == -1) {
+        LOG_ERROR("Unable to initialize sodium");
         return 1;
     }
 
+    if (argc != 2) {
+        LOG_ERROR("Client requires an id");
+        return 2;
+    }
+
     int result = 0;
-    int socket_fd = nw_get_socket();
+    int socket = nw_get_socket();
 
     /*** SOCKET ***/
-    if (socket_fd < 0) {
-        fprintf(stderr, "Error while creating the socket\n");
-        result = 1;
+    if (socket < 0) {
+        LOG_ERROR("While getting the socket");
+        result = 3;
         goto cleanup;
     }
 
     /*** ADDRESS ***/
     struct sockaddr_in address = nw_get_address();
-
-    if (connect(socket_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("Connection Failed");
-        return 1;
+    if (connect(socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        LOG_ERROR("Connection failed");
+        result = 4;
+        goto cleanup;
     }
+
+    // TEMP: The client's password for this test and username
+    // and the server's id
+    const unsigned char *password = "pass123";
+    const unsigned char *id_client = argv[1];
+    const unsigned char *id_server = "dtu.dk";
+
+    /*** CLIENT HELLO ***/
+    Packet hello_packet = pt_initialize_packet(MSG_HELLO);
+    hello_packet.payload =
+        pt_build_hello_payload((const char *)id_client, &hello_packet.header.length);
+    if (nw_send_packet(socket, &hello_packet) < 0) {
+        LOG_ERROR("While sending hello packet");
+        result = 5;
+        goto cleanup;
+    }
+    pt_free_packet_payload(&hello_packet);
 
     /*** CLIENT PAKE ***/
     // TEMP: Our way of getting the public and fixed group elements a,b
@@ -38,12 +62,6 @@ int main()
     unsigned char a[crypto_core_ristretto255_BYTES];
     unsigned char b[crypto_core_ristretto255_BYTES];
     generate_a_b_group_elements(a, b);
-
-    // TEMP: The client's password for this test and username
-    // and the server's id
-    const unsigned char *password = "pass123";
-    const unsigned char *id_client = "jakobkjellberg02";
-    const unsigned char *id_server = "dtu.dk";
 
     // (phi0, phi1) <- H(pi||id_client||id_server)
     unsigned char phi0[crypto_core_ristretto255_SCALARBYTES];
@@ -55,26 +73,52 @@ int main()
     crypto_scalarmult_ristretto255_base(c, phi1);
 
     // Sends phi0 and c to the server
-    // SERVER STUFF GIANLUCA HELP
-    send(socket_fd, phi0, sizeof(phi0), 0);
-    send(socket_fd, c, sizeof(c), 0);
+    Packet setup_packet = pt_initialize_packet(MSG_SETUP);
+    setup_packet.payload = pt_build_setup_payload(phi0, sizeof(phi0), c, sizeof(c),
+                                                  &setup_packet.header.length);
+    if (nw_send_packet(socket, &setup_packet) < 0) {
+        LOG_ERROR("While sending setup packet");
+        result = 6;
+        goto cleanup;
+    }
+    pt_free_packet_payload(&setup_packet);
 
     // alpha <- Z_p
     unsigned char alpha[crypto_core_ristretto255_SCALARBYTES];
     crypto_core_ristretto255_scalar_random(alpha);
-    // u = g^(alpha)a^(phi0) 
+    // u = g^(alpha)a^(phi0)
     unsigned char u[crypto_core_ristretto255_BYTES];
     compute_u_value(alpha, a, phi0, u);
 
-    // SERVER STUFF GIANLUCA HELP
-    send(socket_fd, u, sizeof(u), 0);
+    // Sends u to the server
+    Packet u_packet = pt_initialize_packet(MSG_U);
+    u_packet.payload = pt_build_u_payload(u, sizeof(u), &u_packet.header.length);
+    if (nw_send_packet(socket, &u_packet) < 0) {
+        LOG_ERROR("While sending u packet");
+        result = 7;
+        goto cleanup;
+    }
+    pt_free_packet_payload(&u_packet);
 
-    // Receiving v 
+    // Receiving v
     unsigned char v[crypto_core_ristretto255_BYTES];
-    // Need a way to recieve v value from server
-    // Is this the correct way?
-    // SERVER STUFF GIANLUCA HELP
-    recv(socket_fd, v, sizeof(v), 0);
+
+    Packet v_packet;
+    if (nw_receive_packet(socket, &v_packet) < 0) {
+        LOG_ERROR("While receiving v packet");
+        result = 8;
+        goto cleanup;
+    }
+
+    if (v_packet.header.type != MSG_V ||
+        v_packet.header.length != crypto_core_ristretto255_BYTES) {
+        LOG_ERROR("v packet is not valid");
+        result = 9;
+        goto cleanup;
+    }
+
+    memcpy(v, v_packet.payload, crypto_core_ristretto255_BYTES);
+    pt_free_packet_payload(&v_packet);
 
     // w = (v/b^(phi0))^(alpha)
     // d = (v/b^(phi0))^(phi1)
@@ -89,6 +133,6 @@ int main()
             sizeof(d), k);
 
 cleanup:
-    close(socket_fd);
+    close(socket);
     return result;
 }
