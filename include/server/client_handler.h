@@ -1,5 +1,5 @@
-#ifndef SERVER_NETWORK_H
-#define SERVER_NETWORK_H
+#ifndef CLIENT_HANDLER_H
+#define CLIENT_HANDLER_H
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -16,6 +16,6 @@ typedef struct {
     int socket;
 } Connection;
 
-void sn_handle_connection(const Connection connection);
+void handle_connection(const Connection connection);
 
 #endif

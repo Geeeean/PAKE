@@ -1,5 +1,5 @@
 #include "network.h"
-#include "server/network.h"
+#include "server/client_handler.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -53,7 +53,7 @@ int main()
         }
 
         const Connection connection = {.socket = new_socket};
-        sn_handle_connection(connection);
+        handle_connection(connection);
     }
 
 cleanup:
