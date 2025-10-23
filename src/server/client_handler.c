@@ -47,21 +47,50 @@ static void *handle_client(void *args)
         goto cleanup;
     }
 
-    int length = ntohs(setup_packet.header.length);
-    uint16_t phi0_len;
-    memcpy(&phi0_len, setup_packet.payload, sizeof(phi0_len));
+    unsigned char *phi0 = NULL;
+    unsigned char *c = NULL;
 
-    phi0_len = ntohs(phi0_len);
+    pt_parse_setup_packet(&setup_packet, phi0, c);
 
-    uint16_t c_len = length - sizeof(phi0_len) - phi0_len;
+    // TODO for Radu
+    // https://learn.inside.dtu.dk/d2l/le/lessons/270908/topics/1066318
+    // S samples β ← Zp uniformly at random, computes v = gβ bφ0 and
+    // sends v to C.
 
-    unsigned char *phi0 = malloc(phi0_len);
-    unsigned char *c = malloc(c_len);
+    // at this point u should have:
+    unsigned char v[crypto_core_ristretto255_BYTES] /* = SOMETHING */;
 
-    memcpy(phi0, setup_packet.payload + sizeof(phi0_len), phi0_len);
-    memcpy(c, setup_packet.payload + sizeof(phi0_len) + phi0_len, c_len);
+    Packet v_packet = pt_initialize_packet(MSG_V);
+    v_packet.payload = pt_build_v_payload(v, sizeof(v), &v_packet.header.length);
+    if (nw_send_packet(socket, &v_packet) < 0) {
+        LOG_ERROR("While sending v packet");
+        goto cleanup;
+    }
+    pt_free_packet_payload(&v_packet);
 
-    // TODO: rest of the comunication
+    // Receiving u
+    unsigned char u[crypto_core_ristretto255_BYTES];
+
+    Packet u_packet;
+    if (nw_receive_packet(socket, &u_packet) < 0) {
+        LOG_ERROR("While receiving u packet");
+        goto cleanup;
+    }
+
+    if (u_packet.header.type != MSG_U ||
+        u_packet.header.length != crypto_core_ristretto255_BYTES) {
+        LOG_ERROR("u packet is not valid");
+        goto cleanup;
+    }
+
+    memcpy(u, u_packet.payload, crypto_core_ristretto255_BYTES);
+    pt_free_packet_payload(&v_packet);
+
+    // TODO for Radu
+    // S, upon obtaining u from C, computes
+    // w = (u/aφ0 )β
+    // d = cβ
+    // k = H′(φ0 ‖ idC ‖ idS ‖ u ‖ v ‖ w ‖ d)
 
 cleanup:
     return NULL;

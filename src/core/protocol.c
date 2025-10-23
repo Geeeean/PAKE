@@ -42,6 +42,7 @@ uint8_t *pt_build_setup_payload(const unsigned char *phi0, const uint16_t phi0_l
     return buffer;
 }
 
+// those two can be merged
 uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
                             uint16_t *length)
 {
@@ -50,4 +51,39 @@ uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
     uint8_t *buffer = malloc(*length);
     memcpy(buffer, u, u_len);
     return buffer;
+}
+uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
+                            uint16_t *length)
+{
+    *length = v_len;
+
+    uint8_t *buffer = malloc(*length);
+    memcpy(buffer, v, v_len);
+    return buffer;
+}
+
+int pt_parse_setup_packet(Packet *setup_packet, unsigned char *phi0, unsigned char *c)
+{
+    int length = ntohs(setup_packet->header.length);
+    uint16_t phi0_len;
+    memcpy(&phi0_len, setup_packet->payload, sizeof(phi0_len));
+
+    phi0_len = ntohs(phi0_len);
+
+    uint16_t c_len = length - sizeof(phi0_len) - phi0_len;
+
+    phi0 = malloc(phi0_len);
+    if (!phi0) {
+        return 1;
+    }
+
+    c = malloc(c_len);
+    if (!c) {
+        return 2;
+    }
+
+    memcpy(phi0, setup_packet->payload + sizeof(phi0_len), phi0_len);
+    memcpy(c, setup_packet->payload + sizeof(phi0_len) + phi0_len, c_len);
+
+    return 0;
 }

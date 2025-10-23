@@ -9,7 +9,8 @@ typedef enum {
                //
     MSG_SETUP, // During the setup phase, the client computes (φ0, φ1) ← H(π ‖ idC ‖ idS)
                //  where π is the password. It sets c ← gφ1 and then sends φ0, c to S
-               // [ length (2B) ][ type (1B) ] | [ len1 (2B) ][ phi0 (len1B) ][ c ({length - len1 - 2B}B) ]
+               // [ length (2B) ][ type (1B) ] | [ len1 (2B) ][ phi0 (len1B) ][ c ({length
+               // - len1 - 2B}B) ]
                //
     MSG_U,     // C samples α ← Zp uniformly at random, computes u = gαaφ0 and
                //  sends u to S.
@@ -44,5 +45,9 @@ uint8_t *pt_build_setup_payload(const unsigned char *phi0, const uint16_t phi0_l
                                 uint16_t *length);
 uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
                             uint16_t *length);
+uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
+                            uint16_t *length);
+
+int pt_parse_setup_packet(Packet *setup_packet, unsigned char *phi0, unsigned char *c);
 
 #endif

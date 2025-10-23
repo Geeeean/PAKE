@@ -14,7 +14,6 @@
  ***********************************************/
 int generate_a_b_group_elements(unsigned char a[crypto_core_ristretto255_BYTES],
                                 unsigned char b[crypto_core_ristretto255_BYTES]) {
-    
     unsigned char buffer_a[crypto_hash_sha512_BYTES];
     unsigned char buffer_b[crypto_hash_sha512_BYTES];
     crypto_hash_sha512(buffer_a, (const unsigned char*)HASH_INPUT_A, strlen(HASH_INPUT_A));
