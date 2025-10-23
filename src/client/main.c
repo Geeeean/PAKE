@@ -5,6 +5,7 @@
 
 #include "sodium.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -42,19 +43,30 @@ int main(int argc, char *argv[])
     // TEMP: The client's password for this test and username
     // and the server's id
     const unsigned char *password = "pass123";
-    const unsigned char *id_client = argv[1];
-    const unsigned char *id_server = "dtu.dk";
+    const unsigned char *client_id = (unsigned char *)argv[1];
 
     /*** CLIENT HELLO ***/
     Packet hello_packet = pt_initialize_packet(MSG_HELLO);
     hello_packet.payload =
-        pt_build_hello_payload((const char *)id_client, &hello_packet.header.length);
+        pt_build_hello_payload((const char *)client_id, &hello_packet.header.length);
     if (nw_send_packet(socket, &hello_packet) < 0) {
         LOG_ERROR("While sending hello packet");
         result = 5;
         goto cleanup;
     }
     pt_free_packet_payload(&hello_packet);
+
+    Packet server_hello_packet;
+    if (nw_receive_packet(socket, &server_hello_packet) < 0) {
+        LOG_ERROR("While receiving client hello packet, aborting...");
+        goto cleanup;
+    }
+    if (server_hello_packet.header.type != MSG_HELLO) {
+        LOG_ERROR("First packet received is not a client hello, aborting...");
+        goto cleanup;
+    }
+    const unsigned char *server_id = server_hello_packet.payload;
+    LOG_INFO("Server handshake: %s", server_id);
 
     /*** CLIENT PAKE ***/
     // TEMP: Our way of getting the public and fixed group elements a,b
@@ -63,10 +75,10 @@ int main(int argc, char *argv[])
     unsigned char b[crypto_core_ristretto255_BYTES];
     generate_a_b_group_elements(a, b);
 
-    // (phi0, phi1) <- H(pi||id_client||id_server)
+    // (phi0, phi1) <- H(pi||client_id||server_id)
     unsigned char phi0[crypto_core_ristretto255_SCALARBYTES];
     unsigned char phi1[crypto_core_ristretto255_SCALARBYTES];
-    H_function(password, id_client, id_server, phi0, phi1);
+    H_function(password, client_id, server_id, phi0, phi1);
 
     // c <- g^(phi0)
     unsigned char c[crypto_core_ristretto255_BYTES];
@@ -126,10 +138,10 @@ int main(int argc, char *argv[])
     unsigned char d[crypto_core_ristretto255_BYTES];
     compute_w_d_values_for_client(alpha, b, v, phi0, phi1, w, d);
 
-    // k = H'(phi0||id_client||id_server||u||v||w||d)
+    // k = H'(phi0||client_id||server_id||u||v||w||d)
     unsigned char k[32];
-    H_prime(phi0, sizeof(phi0), id_client, strlen((const char *)id_client), id_server,
-            strlen((const char *)id_server), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
+    H_prime(phi0, sizeof(phi0), client_id, strlen((const char *)client_id), server_id,
+            strlen((const char *)server_id), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
             sizeof(d), k);
 
 cleanup:

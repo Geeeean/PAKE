@@ -1,4 +1,5 @@
 #include "network.h"
+#include "log.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -84,6 +85,7 @@ ssize_t nw_receive_packet(int socket, Packet *packet)
 {
     Header header;
     if (recv(socket, (void *)&header, 3, MSG_WAITALL) != 3) {
+        LOG_ERROR("RECEIVE ERROR");
         return -1;
     }
     header.length = ntohs(header.length);

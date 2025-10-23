@@ -9,8 +9,7 @@ typedef enum {
                //
     MSG_SETUP, // During the setup phase, the client computes (φ0, φ1) ← H(π ‖ idC ‖ idS)
                //  where π is the password. It sets c ← gφ1 and then sends φ0, c to S
-               // [ length (2B) ][ type (1B) ] | [ len1 (2B) ][ phi0 (len1B) ][ c ({length
-               // - len1 - 2B}B) ]
+               // [ length (2B) ][ type (1B) ] | [ len1 (2B) ][ phi0 (len1B) ][ c ({length - len1 - 2B}B) ]
                //
     MSG_U,     // C samples α ← Zp uniformly at random, computes u = gαaφ0 and
                //  sends u to S.
@@ -23,17 +22,17 @@ typedef enum {
                // TODO: maybe a confirm enum?
 } MessageType;
 
+#pragma pack(push, 1)
 typedef struct {
     uint16_t length;
     uint8_t type; // MessageType
 } Header;
+#pragma pack(pop)
 
-#pragma pack(push, 1)
 typedef struct {
     Header header;
     void *payload;
 } Packet;
-#pragma pack(pop)
 
 // Header pt_build_header(MessageType msg_type);
 Packet pt_initialize_packet(MessageType msg_type);

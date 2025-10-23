@@ -14,6 +14,7 @@
 
 typedef struct {
     int socket;
+    char* server_id;
 } Connection;
 
 void handle_connection(const Connection connection);

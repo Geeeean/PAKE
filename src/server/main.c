@@ -6,10 +6,16 @@
 #include <string.h>
 #include <unistd.h>
 
-int main()
+int main(int argc, char *argv[])
 {
     int result = 0;
     int listen_socket_fd = nw_get_socket();
+
+    if (argc != 2) {
+        LOG_ERROR("Server requires an id");
+        result = 1;
+        goto cleanup;
+    }
 
     /*** SOCKET ***/
     if (listen_socket_fd < 0) {
@@ -53,7 +59,7 @@ int main()
             goto cleanup;
         }
 
-        const Connection connection = {.socket = new_socket};
+        const Connection connection = {.socket = new_socket, .server_id = argv[1]};
         handle_connection(connection);
     }
 

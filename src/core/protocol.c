@@ -20,9 +20,9 @@ void pt_free_packet_payload(Packet *packet)
 
 uint8_t *pt_build_hello_payload(const char *id, uint16_t *length)
 {
-    *length = strlen(id);
+    *length = strlen(id) + 1;
 
-    uint8_t *buffer = malloc(sizeof(*length));
+    uint8_t *buffer = malloc(*length);
     memcpy(buffer, id, *length);
     return buffer;
 }
@@ -33,8 +33,10 @@ uint8_t *pt_build_setup_payload(const unsigned char *phi0, const uint16_t phi0_l
 {
     *length = sizeof(phi0_len) + phi0_len + c_len;
 
-    uint8_t *buffer = malloc(sizeof(*length));
-    memcpy(buffer, &phi0_len, sizeof(phi0_len));
+    const uint16_t phi0_len_s = htons(phi0_len);
+
+    uint8_t *buffer = malloc(*length);
+    memcpy(buffer, &phi0_len_s, sizeof(phi0_len_s));
     memcpy(buffer + sizeof(phi0_len), phi0, phi0_len);
     memcpy(buffer + sizeof(phi0_len) + phi0_len, c, c_len);
     return buffer;
@@ -45,7 +47,7 @@ uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
 {
     *length = u_len;
 
-    uint8_t *buffer = malloc(sizeof(*length));
+    uint8_t *buffer = malloc(*length);
     memcpy(buffer, u, u_len);
     return buffer;
 }
