@@ -48,6 +48,8 @@ uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
 uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
                             uint16_t *length);
 
-int pt_parse_setup_packet(Packet *setup_packet, unsigned char *phi0, unsigned char *c);
+int pt_parse_setup_packet(Packet *setup_packet,
+                          unsigned char **phi0, uint16_t *phi0_len_out,
+                          unsigned char **c, uint16_t *c_len_out);
 
 #endif

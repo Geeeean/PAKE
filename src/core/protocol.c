@@ -2,6 +2,12 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#endif
 
 static Header pt_build_header(MessageType msg_type)
 {
@@ -62,28 +68,39 @@ uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
     return buffer;
 }
 
-int pt_parse_setup_packet(Packet *setup_packet, unsigned char *phi0, unsigned char *c)
+int pt_parse_setup_packet(Packet *setup_packet,
+                          unsigned char **phi0, uint16_t *phi0_len_out,
+                          unsigned char **c, uint16_t *c_len_out)
 {
-    int length = ntohs(setup_packet->header.length);
-    uint16_t phi0_len;
-    memcpy(&phi0_len, setup_packet->payload, sizeof(phi0_len));
+    if (!setup_packet || !phi0 || !c || !phi0_len_out || !c_len_out) return 1;
 
-    phi0_len = ntohs(phi0_len);
+    // header.length already in network order in packet header; convert to host order
+    uint16_t length = ntohs(setup_packet->header.length);
 
-    uint16_t c_len = length - sizeof(phi0_len) - phi0_len;
+    if (length < sizeof(uint16_t)) return 2; // not enough data
 
-    phi0 = malloc(phi0_len);
-    if (!phi0) {
-        return 1;
+    uint16_t phi0_len_net;
+    memcpy(&phi0_len_net, setup_packet->payload, sizeof(phi0_len_net));
+    uint16_t phi0_len = ntohs(phi0_len_net);
+
+    if (length < sizeof(phi0_len_net) + phi0_len) return 3; // malformed
+
+    uint16_t c_len = length - sizeof(phi0_len_net) - phi0_len;
+
+    *phi0 = malloc(phi0_len);
+    if (!*phi0) return 4;
+    memcpy(*phi0, setup_packet->payload + sizeof(phi0_len_net), phi0_len);
+
+    *c = malloc(c_len);
+    if (!*c) {
+        free(*phi0);
+        *phi0 = NULL;
+        return 5;
     }
+    memcpy(*c, setup_packet->payload + sizeof(phi0_len_net) + phi0_len, c_len);
 
-    c = malloc(c_len);
-    if (!c) {
-        return 2;
-    }
-
-    memcpy(phi0, setup_packet->payload + sizeof(phi0_len), phi0_len);
-    memcpy(c, setup_packet->payload + sizeof(phi0_len) + phi0_len, c_len);
+    *phi0_len_out = phi0_len;
+    *c_len_out = c_len;
 
     return 0;
 }
