@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 
-void spake_keys() {
-    const unsigned char *password = "pass123";
-    const unsigned char *client_id = "hej123";
-    const unsigned char *server_id = "server123";
+void run_setup_and_key_exchange(const unsigned char *password,
+                                const unsigned char *client_id,
+                                const unsigned char *server_id,
+                                unsigned char key_client[32],
+                                unsigned char key_server[32]) 
+    {
     /*** CLIENT PAKE ***/
     // TEMP: Our way of getting the public and fixed group elements a,b
     // Maybe you have a better way Gianluca
@@ -31,7 +33,7 @@ void spake_keys() {
     unsigned char u[crypto_core_ristretto255_BYTES];
     compute_u_value(alpha, a, phi0, u);
 
-        unsigned char beta[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char beta[crypto_core_ristretto255_SCALARBYTES];
     crypto_core_ristretto255_scalar_random(beta);
 
     unsigned char g_beta[crypto_core_ristretto255_BYTES];
@@ -54,10 +56,9 @@ void spake_keys() {
     compute_w_d_values_for_client(alpha, b, v, phi0, phi1, w, d);
 
     // k = H'(phi0||client_id||server_id||u||v||w||d)
-    unsigned char k_1[32];
     H_prime(phi0, sizeof(phi0), client_id, strlen((const char *)client_id), server_id,
             strlen((const char *)server_id), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
-            sizeof(d), k_1);
+            sizeof(d), key_client);
     
     unsigned char a_phi0[crypto_core_ristretto255_BYTES];
     unsigned char u_a_phi0[crypto_core_ristretto255_BYTES];
@@ -90,8 +91,6 @@ void spake_keys() {
 
     // Compute session key k
     // k = H′(φ0 ‖ idC ‖ idS ‖ u ‖ v ‖ w ‖ d)
-    unsigned char k_2[32];
-
     if (H_prime(phi0, sizeof(phi0),
                 (const unsigned char *)client_id, strlen(client_id),
                 (const unsigned char *)server_id, strlen(server_id),
@@ -99,26 +98,9 @@ void spake_keys() {
                 v, sizeof(v),
                 w, sizeof(w),
                 d, sizeof(d),
-                k_2) != 0) {
+                key_server) != 0) {
         LOG_ERROR("Error computing H'");
-    } else {
-        LOG_INFO("Computed session key k (client):");
-        // for testing purposes only
-        char hex_1[65];
-        for (size_t i = 0; i < sizeof(k_1); i++) {
-            sprintf(hex_1 + (i * 2), "%02x", k_1[i]);
-        }
-        hex_1[64] = '\0';
-        LOG_INFO("%s", hex_1);
-        LOG_INFO("Computed session key k (server):");
-        // for testing purposes only
-        char hex_2[65];
-        for (size_t i = 0; i < sizeof(k_2); i++) {
-            sprintf(hex_2 + (i * 2), "%02x", k_2[i]);
-        }
-        hex_2[64] = '\0';
-        LOG_INFO("%s", hex_2);
-    }
+    } 
 }
 
 void setUp(void) { sodium_init(); }
@@ -128,11 +110,28 @@ void tearDown(void) {}
 void simple_protocol_correct(void) {
     unsigned char key_client[32];
     unsigned char key_server[32];
-    spake_keys();
+    run_setup_and_key_exchange((unsigned char*) "password123", (unsigned char*) "name", 
+                               (unsigned char*) "server", key_client, key_server);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(key_client, key_server, 32);
+}
+
+void protocol_doesnt_produce_same_keys(void) {
+    unsigned char key_client_1[32];
+    unsigned char key_server_1[32];
+    run_setup_and_key_exchange((unsigned char*) "password123", (unsigned char*) "name", 
+                               (unsigned char*) "server", key_client_1, key_server_1);
+    
+    unsigned char key_client_2[32];
+    unsigned char key_server_2[32];
+    run_setup_and_key_exchange((unsigned char*) "password123", (unsigned char*) "name", 
+                               (unsigned char*) "server", key_client_2, key_server_2);
+    TEST_ASSERT_TRUE(memcmp(key_client_1, key_client_2, 32) != 0);
+    TEST_ASSERT_TRUE(memcmp(key_server_1, key_server_2, 32) != 0);
 }
 
 int main() {
     UNITY_BEGIN();
     RUN_TEST(simple_protocol_correct);
+    RUN_TEST(protocol_doesnt_produce_same_keys);
     return UNITY_END();
 }
