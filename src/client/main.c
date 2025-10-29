@@ -17,8 +17,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (argc != 2) {
-        LOG_ERROR("Client requires an id");
+    if (argc != 3) {
+        LOG_ERROR("Client requires an id and a password");
         return 2;
     }
 
@@ -42,8 +42,8 @@ int main(int argc, char *argv[])
 
     // TEMP: The client's password for this test and username
     // and the server's id
-    const unsigned char *password = "pass123";
     const unsigned char *client_id = (unsigned char *)argv[1];
+    const unsigned char *password = (unsigned char *)argv[2];
 
     /*** CLIENT HELLO ***/
     Packet hello_packet = pt_initialize_packet(MSG_HELLO);
@@ -143,6 +143,16 @@ int main(int argc, char *argv[])
     H_prime(phi0, sizeof(phi0), client_id, strlen((const char *)client_id), server_id,
             strlen((const char *)server_id), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
             sizeof(d), k);
+
+    // for testing purposes only
+    char hex[65];
+    for (size_t i = 0; i < sizeof(k); i++) {
+        sprintf(hex + (i * 2), "%02x", k[i]);
+    }
+    hex[64] = '\0';
+
+    LOG_INFO("Computed session key k (client):");
+    LOG_INFO("%s", hex);
 
 cleanup:
     close(socket);
