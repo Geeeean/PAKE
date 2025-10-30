@@ -1,3 +1,4 @@
+#include "client/client.h"
 #include "log.h"
 #include "network.h"
 #include "protocol.h"
@@ -14,21 +15,21 @@ int main(int argc, char *argv[])
 {
     if (sodium_init() == -1) {
         LOG_ERROR("Unable to initialize sodium");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (argc != 3) {
         LOG_ERROR("Client requires an id and a password");
-        return 2;
+        return EXIT_FAILURE;
     }
 
-    int result = 0;
+    int result = EXIT_SUCCESS;
     int socket = nw_get_socket();
 
     /*** SOCKET ***/
     if (socket < 0) {
         LOG_ERROR("While getting the socket");
-        result = 3;
+        result = EXIT_FAILURE;
         goto cleanup;
     }
 
@@ -36,37 +37,40 @@ int main(int argc, char *argv[])
     struct sockaddr_in address = nw_get_address();
     if (connect(socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
         LOG_ERROR("Connection failed");
-        result = 4;
+        result = EXIT_FAILURE;
         goto cleanup;
     }
 
-    // TEMP: The client's password for this test and username
-    // and the server's id
-    const unsigned char *client_id = (unsigned char *)argv[1];
-    const unsigned char *password = (unsigned char *)argv[2];
+    Client *client = client_init(argv[1], argv[2], socket);
 
     /*** CLIENT HELLO ***/
-    Packet hello_packet = pt_initialize_packet(MSG_HELLO);
-    hello_packet.payload =
-        pt_build_hello_payload((const char *)client_id, &hello_packet.header.length);
-    if (nw_send_packet(socket, &hello_packet) < 0) {
+    if (client_send_hello_packet(client)) {
         LOG_ERROR("While sending hello packet");
-        result = 5;
+        result = EXIT_FAILURE;
         goto cleanup;
     }
-    pt_free_packet_payload(&hello_packet);
+
+    LOG_INFO("Hello packet sent");
 
     Packet server_hello_packet;
-    if (nw_receive_packet(socket, &server_hello_packet) < 0) {
-        LOG_ERROR("While receiving client hello packet, aborting...");
+    switch (client_receive_hello_packet(client, &server_hello_packet)) {
+    case RR_SUCCESS:
+        LOG_INFO("Hello packet received");
+        break;
+    case RR_TYPE_ERROR:
+        LOG_ERROR("Expected HELLO packet, aborting...");
+        result = EXIT_FAILURE;
         goto cleanup;
-    }
-    if (server_hello_packet.header.type != MSG_HELLO) {
-        LOG_ERROR("First packet received is not a client hello, aborting...");
+        break;
+    default:
+        LOG_ERROR("While receiving HELLO packet, aborting...");
+        result = EXIT_FAILURE;
         goto cleanup;
+        break;
     }
+
     const unsigned char *server_id = server_hello_packet.payload;
-    LOG_INFO("Server handshake: %s", server_id);
+    // LOG_INFO("Server handshake: %s", server_id);
 
     /*** CLIENT PAKE ***/
     // TEMP: Our way of getting the public and fixed group elements a,b
