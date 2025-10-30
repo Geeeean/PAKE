@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     // alpha <- Z_p
     unsigned char alpha[crypto_core_ristretto255_SCALARBYTES];
     crypto_core_ristretto255_scalar_random(alpha);
-    // u = g^(alpha)a^(phi0)
+    // u <- g^(alpha)a^(phi0)
     unsigned char u[crypto_core_ristretto255_BYTES];
     compute_u_value(alpha, a, phi0, u);
 
@@ -132,13 +132,13 @@ int main(int argc, char *argv[])
     memcpy(v, v_packet.payload, crypto_core_ristretto255_BYTES);
     pt_free_packet_payload(&v_packet);
 
-    // w = (v/b^(phi0))^(alpha)
-    // d = (v/b^(phi0))^(phi1)
+    // w <- (v/b^(phi0))^(alpha)
+    // d <- (v/b^(phi0))^(phi1)
     unsigned char w[crypto_core_ristretto255_BYTES];
     unsigned char d[crypto_core_ristretto255_BYTES];
     compute_w_d_values_for_client(alpha, b, v, phi0, phi1, w, d);
 
-    // k = H'(phi0||client_id||server_id||u||v||w||d)
+    // k <- H'(phi0||client_id||server_id||u||v||w||d)
     unsigned char k[32];
     H_prime(phi0, sizeof(phi0), client_id, strlen((const char *)client_id), server_id,
             strlen((const char *)server_id), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,

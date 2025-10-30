@@ -4,7 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 
-void run_setup_and_key_exchange(const unsigned char *password,
+void setUp(void) { sodium_init(); }
+
+void tearDown(void) {}
+
+int run_setup_and_key_exchange(const unsigned char *password,
                                 const unsigned char *client_id,
                                 const unsigned char *server_id,
                                 unsigned char key_client[32],
@@ -29,7 +33,7 @@ void run_setup_and_key_exchange(const unsigned char *password,
     // alpha <- Z_p
     unsigned char alpha[crypto_core_ristretto255_SCALARBYTES];
     crypto_core_ristretto255_scalar_random(alpha);
-    // u = g^(alpha)a^(phi0)
+    // u <- g^(alpha)a^(phi0)
     unsigned char u[crypto_core_ristretto255_BYTES];
     compute_u_value(alpha, a, phi0, u);
 
@@ -44,9 +48,7 @@ void run_setup_and_key_exchange(const unsigned char *password,
 
     if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) {
         LOG_ERROR("Error computing b^{phi0}");
-        free(phi0);
-        free(c);
-        sodium_memzero(beta, sizeof(beta));
+        return -1;
     }
 
     crypto_core_ristretto255_add(v, g_beta, b_phi0);
@@ -65,28 +67,19 @@ void run_setup_and_key_exchange(const unsigned char *password,
 
     if (crypto_scalarmult_ristretto255(a_phi0, phi0, a) != 0) {
         LOG_ERROR("Error computing a^{phi0}");
-        free(phi0);
-        free(c);
-        sodium_memzero(beta, sizeof(beta));
+        return -1;
     }
 
     crypto_core_ristretto255_sub(u_a_phi0, u, a_phi0);
 
     if (crypto_scalarmult_ristretto255(w, beta, u_a_phi0) != 0) {
         LOG_ERROR("Error computing w");
-        free(phi0);
-        free(c);
-        sodium_memzero(beta, sizeof(beta));
-        sodium_memzero(a_phi0, sizeof(a_phi0));
+        return -1;
     }
 
     if (crypto_scalarmult_ristretto255(d, beta, c) != 0) {
         LOG_ERROR("Error computing d");
-        free(phi0);
-        free(c);
-        sodium_memzero(beta, sizeof(beta));
-        sodium_memzero(a_phi0, sizeof(a_phi0));
-        sodium_memzero(u_a_phi0, sizeof(u_a_phi0));
+        return -1;
     }
 
     // Compute session key k
@@ -100,12 +93,10 @@ void run_setup_and_key_exchange(const unsigned char *password,
                 d, sizeof(d),
                 key_server) != 0) {
         LOG_ERROR("Error computing H'");
+        return -1;
     } 
+    return 0;
 }
-
-void setUp(void) { sodium_init(); }
-
-void tearDown(void) {}
 
 void simple_protocol_correct(void) {
     unsigned char key_client[32];

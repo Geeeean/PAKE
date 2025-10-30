@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "sodium.h"
 #include "string.h"
+#include "log.h"
 
 // Maybe a better way to make group elements global and static but this should
 // work for now
@@ -134,7 +135,10 @@ int compute_u_value(const unsigned char alpha[crypto_core_ristretto255_SCALARBYT
 
     // We have to check everytime for no warnings
     // to see if the first arg is the identity element
-    if (crypto_scalarmult_ristretto255(a_phi0, phi0, a) != 0) return -1;
+    if (crypto_scalarmult_ristretto255(a_phi0, phi0, a) != 0) {
+        LOG_ERROR("a_phi0 is not an identity element");
+        return -1;
+    } 
     crypto_core_ristretto255_add(u, g_alpha, a_phi0);
     sodium_memzero(g_alpha, sizeof(g_alpha));
     sodium_memzero(a_phi0, sizeof(a_phi0));
@@ -160,12 +164,21 @@ int compute_w_d_values_for_client(const unsigned char alpha[crypto_core_ristrett
     if (!alpha || !b || !v || !phi0 || !phi1) return -1;
     
     unsigned char b_phi0[crypto_core_ristretto255_BYTES];
-    if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) return -1;
+    if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) {
+        LOG_ERROR("b_phi0 is not an identity element");
+        return -1;
+    } 
     unsigned char v_b_phi0[crypto_core_ristretto255_BYTES];
     crypto_core_ristretto255_sub(v_b_phi0, v, b_phi0);
 
-    if (crypto_scalarmult_ristretto255(w, alpha, v_b_phi0) != 0) return -1;
-    if (crypto_scalarmult_ristretto255(d, phi1, v_b_phi0) != 0) return -1;
+    if (crypto_scalarmult_ristretto255(w, alpha, v_b_phi0) != 0) {
+        LOG_ERROR("w is not an identity element");
+        return -1;
+    }
+    if (crypto_scalarmult_ristretto255(d, phi1, v_b_phi0) != 0) {
+        LOG_ERROR("d is not an identity element");
+        return -1;
+    } 
     sodium_memzero(b_phi0, sizeof(b_phi0));
     sodium_memzero(v_b_phi0, sizeof(v_b_phi0));
     return 0;
