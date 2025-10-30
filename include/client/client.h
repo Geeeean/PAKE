@@ -20,13 +20,13 @@ int client_send_u_packet(Client *client);
 ReceiveResult client_receive_hello_packet(Client *client);
 ReceiveResult client_receive_v_packet(Client *client);
 
-void client_compute_group_elements(Client *client);
+int client_compute_group_elements(Client *client);
 int client_compute_phi(Client *client);
-void client_compute_c(Client *client);
+int client_compute_c(Client *client);
 void client_compute_alpha(Client *client);
-void client_compute_u(Client *client);
-void client_compute_w_d(Client *client);
-void client_compute_k(Client *client);
+int client_compute_u(Client *client);
+int client_compute_w_d(Client *client);
+int client_compute_k(Client *client);
 
 unsigned char *client_get_k(Client *client);
 uint64_t client_get_k_size(Client *client);

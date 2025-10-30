@@ -170,9 +170,9 @@ ReceiveResult client_receive_v_packet(Client *client)
     return RR_SUCCESS;
 }
 
-void client_compute_group_elements(Client *client)
+int client_compute_group_elements(Client *client)
 {
-    generate_a_b_group_elements(client->a, client->b);
+    return generate_a_b_group_elements(client->a, client->b);
 }
 
 int client_compute_phi(Client *client)
@@ -188,9 +188,9 @@ int client_compute_phi(Client *client)
     return EXIT_SUCCESS;
 }
 
-void client_compute_c(Client *client)
+int client_compute_c(Client *client)
 {
-    crypto_scalarmult_ristretto255_base(client->c, client->phi1);
+    return crypto_scalarmult_ristretto255_base(client->c, client->phi1);
 }
 
 void client_compute_alpha(Client *client)
@@ -198,20 +198,20 @@ void client_compute_alpha(Client *client)
     crypto_core_ristretto255_scalar_random(client->alpha);
 }
 
-void client_compute_u(Client *client)
+int client_compute_u(Client *client)
 {
-    compute_u_value(client->alpha, client->a, client->phi0, client->u);
+    return compute_u_value(client->alpha, client->a, client->phi0, client->u);
 }
 
-void client_compute_w_d(Client *client)
+int client_compute_w_d(Client *client)
 {
-    compute_w_d_values_for_client(client->alpha, client->b, client->v, client->phi0,
+    return compute_w_d_values_for_client(client->alpha, client->b, client->v, client->phi0,
                                   client->phi1, client->w, client->d);
 }
 
-void client_compute_k(Client *client)
+int client_compute_k(Client *client)
 {
-    H_prime(client->phi0, sizeof(client->phi0), (const unsigned char *)client->client_id,
+    return H_prime(client->phi0, sizeof(client->phi0), (const unsigned char *)client->client_id,
             strlen(client->client_id), (const unsigned char *)client->server_id,
             strlen(client->server_id), client->u, sizeof(client->u), client->v,
             sizeof(client->v), client->w, sizeof(client->w), client->d, sizeof(client->d),

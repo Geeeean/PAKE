@@ -65,9 +65,23 @@ int main(int argc, char *argv[])
     }
 
     /*** CLIENT PAKE ***/
-    client_compute_group_elements(client);
-    client_compute_phi(client);
-    client_compute_c(client);
+    if (client_compute_group_elements(client)) {
+        LOG_ERROR("While computing group elements, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_phi(client)) {
+        LOG_ERROR("While computing phi, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_c(client)) {
+        LOG_ERROR("While computing c, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
 
     // Sends phi0 and c to the server
     if (client_send_setup_packet(client)) {
@@ -79,7 +93,12 @@ int main(int argc, char *argv[])
     LOG_INFO("SETUP packet sent");
 
     client_compute_alpha(client);
-    client_compute_u(client);
+
+    if (client_compute_u(client)) {
+        LOG_ERROR("While computing u");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
 
     // Sends u to the server
     if (client_send_u_packet(client)) {
@@ -109,8 +128,17 @@ int main(int argc, char *argv[])
         break;
     }
 
-    client_compute_w_d(client);
-    client_compute_k(client);
+    if (client_compute_w_d(client)) {
+        LOG_ERROR("While computing w and d");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_k(client)) {
+        LOG_ERROR("While computing k");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
 
     unsigned char *k = client_get_k(client);
 
