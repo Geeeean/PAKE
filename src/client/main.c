@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
         goto cleanup;
     }
 
-    LOG_INFO("Hello packet sent");
+    LOG_INFO("HELLO packet sent");
 
     switch (client_receive_hello_packet(client)) {
     case RR_SUCCESS:
@@ -153,6 +153,7 @@ int main(int argc, char *argv[])
     LOG_INFO("%s", hex);
 
 cleanup:
+    // TODO: free client
     close(socket);
     return result;
 }
