@@ -1,10 +1,6 @@
 #include "client/client.h"
 #include "log.h"
 #include "network.h"
-#include "protocol.h"
-#include "utils.h"
-
-#include "sodium.h"
 
 #include <ctype.h>
 #include <stdio.h>
