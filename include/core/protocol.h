@@ -16,11 +16,11 @@ typedef enum {
                //  sends u to S.
                // [ length (2B) ][ type (1B) ] | [ u (lengthB) ]
                //
-    MSG_V      // S samples β ← Zp uniformly at random, computes v = gβ bφ0 and
+    MSG_V,     // S samples β ← Zp uniformly at random, computes v = gβ bφ0 and
                //  sends v to C.
                // [ length (2B) ][ type (1B) ] | [ v (lengthB) ]
                //
-               // TODO: maybe a confirm enum?
+    MSG_CLOSE, // for closing connection (in case of error)
 } MessageType;
 
 #pragma pack(push, 1)
@@ -48,8 +48,7 @@ uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
 uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
                             uint16_t *length);
 
-int pt_parse_setup_packet(Packet *setup_packet,
-                          unsigned char **phi0, uint16_t *phi0_len_out,
-                          unsigned char **c, uint16_t *c_len_out);
+int pt_parse_setup_packet(Packet *setup_packet, unsigned char **phi0,
+                          uint16_t *phi0_len_out, unsigned char **c, uint16_t *c_len_out);
 
 #endif

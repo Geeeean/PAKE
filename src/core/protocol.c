@@ -58,6 +58,7 @@ uint8_t *pt_build_u_payload(const unsigned char *u, const uint16_t u_len,
     memcpy(buffer, u, u_len);
     return buffer;
 }
+
 uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
                             uint16_t *length)
 {
@@ -68,27 +69,30 @@ uint8_t *pt_build_v_payload(const unsigned char *v, const uint16_t v_len,
     return buffer;
 }
 
-int pt_parse_setup_packet(Packet *setup_packet,
-                          unsigned char **phi0, uint16_t *phi0_len_out,
-                          unsigned char **c, uint16_t *c_len_out)
+int pt_parse_setup_packet(Packet *setup_packet, unsigned char **phi0,
+                          uint16_t *phi0_len_out, unsigned char **c, uint16_t *c_len_out)
 {
-    if (!setup_packet || !phi0 || !c || !phi0_len_out || !c_len_out) return 1;
+    if (!setup_packet || !phi0 || !c || !phi0_len_out || !c_len_out)
+        return 1;
 
     // header.length already in network order in packet header; convert to host order
-    uint16_t length = ntohs(setup_packet->header.length);
+    uint16_t length = setup_packet->header.length;
 
-    if (length < sizeof(uint16_t)) return 2; // not enough data
+    if (length < sizeof(uint16_t))
+        return 2; // not enough data
 
     uint16_t phi0_len_net;
     memcpy(&phi0_len_net, setup_packet->payload, sizeof(phi0_len_net));
     uint16_t phi0_len = ntohs(phi0_len_net);
 
-    if (length < sizeof(phi0_len_net) + phi0_len) return 3; // malformed
+    if (length < sizeof(phi0_len_net) + phi0_len)
+        return 3; // malformed
 
     uint16_t c_len = length - sizeof(phi0_len_net) - phi0_len;
 
     *phi0 = malloc(phi0_len);
-    if (!*phi0) return 4;
+    if (!*phi0)
+        return 4;
     memcpy(*phi0, setup_packet->payload + sizeof(phi0_len_net), phi0_len);
 
     *c = malloc(c_len);
