@@ -2,6 +2,7 @@
 #include "log.h"
 #include "network.h"
 #include "protocol.h"
+#include "server/storage.h"
 #include "utils.h"
 
 #include "sodium.h"
@@ -13,9 +14,9 @@
 #include <pthread.h>
 #endif
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 static void *handle_client(void *args)
 {
@@ -69,9 +70,30 @@ static void *handle_client(void *args)
     pt_free_packet_payload(&setup_packet); // payload copied, free the packet payload
 
     if (phi0_len != crypto_core_ristretto255_SCALARBYTES) {
-        LOG_ERROR("phi0 length mismatch: expected %d, got %d", crypto_core_ristretto255_SCALARBYTES, phi0_len);
+        LOG_ERROR("phi0 length mismatch: expected %d, got %d",
+                  crypto_core_ristretto255_SCALARBYTES, phi0_len);
         free(phi0);
         free(c);
+        goto cleanup;
+    }
+
+    switch (storage_verify_secret(client_id, phi0, phi0_len, c, c_len)) {
+    case VR_SUCCESS:
+        LOG_INFO("Secret verified correctly");
+        break;
+    case VR_NOT_FOUND:
+        LOG_INFO("Secret not found, storing...");
+        if (storage_store_secret(client_id, phi0, phi0_len, c, c_len)) {
+            LOG_ERROR("While storing secret");
+            goto cleanup;
+        }
+        LOG_INFO("Secret stored");
+        break;
+    case VR_NOT_VALID:
+        LOG_INFO("Secret is not valid, aborting...");
+        goto cleanup;
+    default:
+        LOG_ERROR("While verifying secret");
         goto cleanup;
     }
 
@@ -94,7 +116,8 @@ static void *handle_client(void *args)
         goto cleanup;
     }
 
-    if (u_packet.header.type != MSG_U || u_packet.header.length != crypto_core_ristretto255_BYTES) {
+    if (u_packet.header.type != MSG_U ||
+        u_packet.header.length != crypto_core_ristretto255_BYTES) {
         LOG_ERROR("u packet invalid");
         pt_free_packet_payload(&u_packet);
         free(phi0);
@@ -180,23 +203,19 @@ static void *handle_client(void *args)
     // k = H′(φ0 ‖ idC ‖ idS ‖ u ‖ v ‖ w ‖ d)
     unsigned char k[32];
 
-    if (H_prime(phi0, phi0_len,
-                (const unsigned char *)client_id, strlen(client_id),
-                (const unsigned char *)server_id, strlen(server_id),
-                u, sizeof(u),
-                v, sizeof(v),
-                w, sizeof(w),
-                d, sizeof(d),
-                k) != 0) {
+    if (H_prime(phi0, phi0_len, (const unsigned char *)client_id, strlen(client_id),
+                (const unsigned char *)server_id, strlen(server_id), u, sizeof(u), v,
+                sizeof(v), w, sizeof(w), d, sizeof(d), k) != 0) {
         LOG_ERROR("Error computing H'");
     } else {
-        LOG_INFO("Computed session key k (server):");
         // for testing purposes only
         char hex[65];
         for (size_t i = 0; i < sizeof(k); i++) {
             sprintf(hex + (i * 2), "%02x", k[i]);
         }
         hex[64] = '\0';
+
+        LOG_INFO("Computed session key k (server):");
         LOG_INFO("%s", hex);
     }
 
@@ -217,13 +236,8 @@ void handle_connection(const Connection connection)
 {
 #ifdef _WIN32
     // On Windows, create a thread with CreateThread
-    HANDLE thread = CreateThread(
-        NULL,
-        0,
-        (LPTHREAD_START_ROUTINE)handle_client,
-        (LPVOID)&connection,
-        0,
-        NULL);
+    HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)handle_client,
+                                 (LPVOID)&connection, 0, NULL);
     if (thread) {
         CloseHandle(thread);
     } else {
