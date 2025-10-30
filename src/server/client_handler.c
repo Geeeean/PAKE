@@ -118,7 +118,7 @@ static void *handle_client(void *args)
 
     if (u_packet.header.type != MSG_U ||
         u_packet.header.length != crypto_core_ristretto255_BYTES) {
-        LOG_ERROR("u packet invalid");
+        LOG_ERROR("u packet invalid %d %d", u_packet.header.type, u_packet.header.length);
         pt_free_packet_payload(&u_packet);
         free(phi0);
         free(c);

@@ -45,17 +45,16 @@ int main(int argc, char *argv[])
 
     /*** CLIENT HELLO ***/
     if (client_send_hello_packet(client)) {
-        LOG_ERROR("While sending hello packet");
+        LOG_ERROR("While sending HELLO packet");
         result = EXIT_FAILURE;
         goto cleanup;
     }
 
     LOG_INFO("Hello packet sent");
 
-    Packet server_hello_packet;
-    switch (client_receive_hello_packet(client, &server_hello_packet)) {
+    switch (client_receive_hello_packet(client)) {
     case RR_SUCCESS:
-        LOG_INFO("Hello packet received");
+        LOG_INFO("HELLO packet received");
         break;
     case RR_TYPE_ERROR:
         LOG_ERROR("Expected HELLO packet, aborting...");
@@ -69,88 +68,59 @@ int main(int argc, char *argv[])
         break;
     }
 
-    const unsigned char *server_id = server_hello_packet.payload;
-    // LOG_INFO("Server handshake: %s", server_id);
-
     /*** CLIENT PAKE ***/
-    // TEMP: Our way of getting the public and fixed group elements a,b
-    // Maybe you have a better way Gianluca
-    unsigned char a[crypto_core_ristretto255_BYTES];
-    unsigned char b[crypto_core_ristretto255_BYTES];
-    generate_a_b_group_elements(a, b);
-
-    // (phi0, phi1) <- H(pi||client_id||server_id)
-    unsigned char phi0[crypto_core_ristretto255_SCALARBYTES];
-    unsigned char phi1[crypto_core_ristretto255_SCALARBYTES];
-    H_function(password, client_id, server_id, phi0, phi1);
-
-    // c <- g^(phi0)
-    unsigned char c[crypto_core_ristretto255_BYTES];
-    crypto_scalarmult_ristretto255_base(c, phi1);
+    client_compute_group_elements(client);
+    client_compute_phi(client);
+    client_compute_c(client);
 
     // Sends phi0 and c to the server
-    Packet setup_packet = pt_initialize_packet(MSG_SETUP);
-    setup_packet.payload = pt_build_setup_payload(phi0, sizeof(phi0), c, sizeof(c),
-                                                  &setup_packet.header.length);
-    if (nw_send_packet(socket, &setup_packet) < 0) {
-        LOG_ERROR("While sending setup packet");
-        result = 6;
+    if (client_send_setup_packet(client)) {
+        LOG_ERROR("While sending SETUP packet");
+        result = EXIT_FAILURE;
         goto cleanup;
     }
-    pt_free_packet_payload(&setup_packet);
 
-    // alpha <- Z_p
-    unsigned char alpha[crypto_core_ristretto255_SCALARBYTES];
-    crypto_core_ristretto255_scalar_random(alpha);
-    // u <- g^(alpha)a^(phi0)
-    unsigned char u[crypto_core_ristretto255_BYTES];
-    compute_u_value(alpha, a, phi0, u);
+    LOG_INFO("SETUP packet sent");
+
+    client_compute_alpha(client);
+    client_compute_u(client);
 
     // Sends u to the server
-    Packet u_packet = pt_initialize_packet(MSG_U);
-    u_packet.payload = pt_build_u_payload(u, sizeof(u), &u_packet.header.length);
-    if (nw_send_packet(socket, &u_packet) < 0) {
-        LOG_ERROR("While sending u packet");
-        result = 7;
+    if (client_send_u_packet(client)) {
+        LOG_ERROR("While sending U packet");
+        result = EXIT_FAILURE;
         goto cleanup;
     }
-    pt_free_packet_payload(&u_packet);
+
+    LOG_INFO("U packet sent");
 
     // Receiving v
     unsigned char v[crypto_core_ristretto255_BYTES];
 
-    Packet v_packet;
-    if (nw_receive_packet(socket, &v_packet) < 0) {
-        LOG_ERROR("While receiving v packet");
-        result = 8;
+    switch (client_receive_v_packet(client)) {
+    case RR_SUCCESS:
+        LOG_INFO("V packet received");
+        break;
+    case RR_TYPE_ERROR:
+        LOG_ERROR("Expected V packet, aborting...");
+        result = EXIT_FAILURE;
         goto cleanup;
+        break;
+    default:
+        LOG_ERROR("While receiving V packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+        break;
     }
 
-    if (v_packet.header.type != MSG_V ||
-        v_packet.header.length != crypto_core_ristretto255_BYTES) {
-        LOG_ERROR("v packet is not valid");
-        result = 9;
-        goto cleanup;
-    }
+    client_compute_w_d(client);
+    client_compute_k(client);
 
-    memcpy(v, v_packet.payload, crypto_core_ristretto255_BYTES);
-    pt_free_packet_payload(&v_packet);
-
-    // w <- (v/b^(phi0))^(alpha)
-    // d <- (v/b^(phi0))^(phi1)
-    unsigned char w[crypto_core_ristretto255_BYTES];
-    unsigned char d[crypto_core_ristretto255_BYTES];
-    compute_w_d_values_for_client(alpha, b, v, phi0, phi1, w, d);
-
-    // k <- H'(phi0||client_id||server_id||u||v||w||d)
-    unsigned char k[32];
-    H_prime(phi0, sizeof(phi0), client_id, strlen((const char *)client_id), server_id,
-            strlen((const char *)server_id), u, sizeof(u), v, sizeof(v), w, sizeof(w), d,
-            sizeof(d), k);
+    unsigned char *k = client_get_k(client);
 
     // for testing purposes only
     char hex[65];
-    for (size_t i = 0; i < sizeof(k); i++) {
+    for (size_t i = 0; i < client_get_k_size(client); i++) {
         sprintf(hex + (i * 2), "%02x", k[i]);
     }
     hex[64] = '\0';

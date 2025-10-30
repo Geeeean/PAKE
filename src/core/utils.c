@@ -1,7 +1,7 @@
 #include "utils.h"
+#include "log.h"
 #include "sodium.h"
 #include "string.h"
-#include "log.h"
 
 // Maybe a better way to make group elements global and static but this should
 // work for now
@@ -14,11 +14,14 @@
  *  @param b   32 byte scalar
  ***********************************************/
 int generate_a_b_group_elements(unsigned char a[crypto_core_ristretto255_BYTES],
-                                unsigned char b[crypto_core_ristretto255_BYTES]) {
+                                unsigned char b[crypto_core_ristretto255_BYTES])
+{
     unsigned char buffer_a[crypto_hash_sha512_BYTES];
     unsigned char buffer_b[crypto_hash_sha512_BYTES];
-    crypto_hash_sha512(buffer_a, (const unsigned char*)HASH_INPUT_A, strlen(HASH_INPUT_A));
-    crypto_hash_sha512(buffer_b, (const unsigned char*)HASH_INPUT_B, strlen(HASH_INPUT_B));
+    crypto_hash_sha512(buffer_a, (const unsigned char *)HASH_INPUT_A,
+                       strlen(HASH_INPUT_A));
+    crypto_hash_sha512(buffer_b, (const unsigned char *)HASH_INPUT_B,
+                       strlen(HASH_INPUT_B));
 
     // Right now the way is just to generate the group element from the output of
     // a hash function
@@ -38,27 +41,31 @@ int generate_a_b_group_elements(unsigned char a[crypto_core_ristretto255_BYTES],
  *  @param output0    Output for phi0
  *  @param output1    Output for phi1
  ***********************************************/
-int H_function(const unsigned char* password, const unsigned char* id_client, 
-                const unsigned char* id_server, unsigned char output0[crypto_core_ristretto255_BYTES], 
-                unsigned char output1[crypto_core_ristretto255_BYTES]) {
-    
-    if (!password || !id_client || !id_server) return -1;
+int H_function(const unsigned char *password, const unsigned char *id_client,
+               const unsigned char *id_server,
+               unsigned char output0[crypto_core_ristretto255_BYTES],
+               unsigned char output1[crypto_core_ristretto255_BYTES])
+{
+
+    if (!password || !id_client || !id_server)
+        return -1;
     // https://libsodium.gitbook.io/doc/advanced/sha-2_hash_function
     unsigned char hash[crypto_hash_sha512_BYTES];
     crypto_hash_sha512_state state;
     crypto_hash_sha512_init(&state);
 
-    crypto_hash_sha512_update(&state, password, strlen(password));
-    crypto_hash_sha512_update(&state, id_client, strlen(id_client));
-    crypto_hash_sha512_update(&state, id_server, strlen(id_server));
+    crypto_hash_sha512_update(&state, password, strlen((const char *)password));
+    crypto_hash_sha512_update(&state, id_client, strlen((const char *)id_client));
+    crypto_hash_sha512_update(&state, id_server, strlen((const char *)id_server));
 
     crypto_hash_sha512_final(&state, hash);
-    
+
     // 512 bits to two bitstrings of length 256 bits + padding
     unsigned char buffer0[crypto_hash_sha512_BYTES] = {0};
     memcpy(buffer0, hash, crypto_core_ristretto255_BYTES);
     unsigned char buffer1[crypto_hash_sha512_BYTES] = {0};
-    memcpy(buffer1, hash + crypto_core_ristretto255_BYTES, crypto_core_ristretto255_BYTES);
+    memcpy(buffer1, hash + crypto_core_ristretto255_BYTES,
+           crypto_core_ristretto255_BYTES);
     sodium_memzero(hash, sizeof(hash));
 
     // https://libsodium.net/api/LibSodium.CryptoRistretto.html#LibSodium_CryptoRistretto_ReduceScalar_System_ReadOnlySpan_System_Byte__System_Span_System_Byte__
@@ -70,16 +77,14 @@ int H_function(const unsigned char* password, const unsigned char* id_client,
     return 0;
 }
 
-int H_prime(const unsigned char* phi0, size_t phi0_len,
-            const unsigned char* id_client, size_t id_client_len,
-            const unsigned char* id_server, size_t id_server_len,
-            const unsigned char* u, size_t u_len,
-            const unsigned char* v, size_t v_len,
-            const unsigned char* w, size_t w_len,
-            const unsigned char* d, size_t d_len,
+int H_prime(const unsigned char *phi0, size_t phi0_len, const unsigned char *id_client,
+            size_t id_client_len, const unsigned char *id_server, size_t id_server_len,
+            const unsigned char *u, size_t u_len, const unsigned char *v, size_t v_len,
+            const unsigned char *w, size_t w_len, const unsigned char *d, size_t d_len,
             unsigned char output[32])
 {
-    if (output == NULL) return -1;
+    if (output == NULL)
+        return -1;
 
     crypto_hash_sha512_state state;
     unsigned char hash[crypto_hash_sha512_BYTES];
@@ -124,9 +129,11 @@ int H_prime(const unsigned char* phi0, size_t phi0_len,
  ***********************************************/
 int compute_u_value(const unsigned char alpha[crypto_core_ristretto255_SCALARBYTES],
                     const unsigned char a[crypto_core_ristretto255_BYTES],
-                    const unsigned char phi0[crypto_core_ristretto255_SCALARBYTES], 
-                    unsigned char u[crypto_core_ristretto255_BYTES]) {
-    if (!alpha || !a || !phi0) return -1;
+                    const unsigned char phi0[crypto_core_ristretto255_SCALARBYTES],
+                    unsigned char u[crypto_core_ristretto255_BYTES])
+{
+    if (!alpha || !a || !phi0)
+        return -1;
 
     unsigned char g_alpha[crypto_core_ristretto255_BYTES];
     crypto_scalarmult_ristretto255_base(g_alpha, alpha);
@@ -138,7 +145,7 @@ int compute_u_value(const unsigned char alpha[crypto_core_ristretto255_SCALARBYT
     if (crypto_scalarmult_ristretto255(a_phi0, phi0, a) != 0) {
         LOG_ERROR("a_phi0 is not an identity element");
         return -1;
-    } 
+    }
     crypto_core_ristretto255_add(u, g_alpha, a_phi0);
     sodium_memzero(g_alpha, sizeof(g_alpha));
     sodium_memzero(a_phi0, sizeof(a_phi0));
@@ -154,20 +161,23 @@ int compute_u_value(const unsigned char alpha[crypto_core_ristretto255_SCALARBYT
  *  @param w       Output for group element
  *  @param d       Output for group element
  ***********************************************/
-int compute_w_d_values_for_client(const unsigned char alpha[crypto_core_ristretto255_SCALARBYTES],
-                          const unsigned char b[crypto_core_ristretto255_BYTES],
-                          const unsigned char v[crypto_core_ristretto255_BYTES],
-                          const unsigned char phi0[crypto_core_ristretto255_SCALARBYTES],
-                          const unsigned char phi1[crypto_core_ristretto255_SCALARBYTES],
-                          unsigned char w[crypto_core_ristretto255_BYTES],
-                          unsigned char d[crypto_core_ristretto255_BYTES]) {
-    if (!alpha || !b || !v || !phi0 || !phi1) return -1;
-    
+int compute_w_d_values_for_client(
+    const unsigned char alpha[crypto_core_ristretto255_SCALARBYTES],
+    const unsigned char b[crypto_core_ristretto255_BYTES],
+    const unsigned char v[crypto_core_ristretto255_BYTES],
+    const unsigned char phi0[crypto_core_ristretto255_SCALARBYTES],
+    const unsigned char phi1[crypto_core_ristretto255_SCALARBYTES],
+    unsigned char w[crypto_core_ristretto255_BYTES],
+    unsigned char d[crypto_core_ristretto255_BYTES])
+{
+    if (!alpha || !b || !v || !phi0 || !phi1)
+        return -1;
+
     unsigned char b_phi0[crypto_core_ristretto255_BYTES];
     if (crypto_scalarmult_ristretto255(b_phi0, phi0, b) != 0) {
         LOG_ERROR("b_phi0 is not an identity element");
         return -1;
-    } 
+    }
     unsigned char v_b_phi0[crypto_core_ristretto255_BYTES];
     crypto_core_ristretto255_sub(v_b_phi0, v, b_phi0);
 
@@ -178,9 +188,8 @@ int compute_w_d_values_for_client(const unsigned char alpha[crypto_core_ristrett
     if (crypto_scalarmult_ristretto255(d, phi1, v_b_phi0) != 0) {
         LOG_ERROR("d is not an identity element");
         return -1;
-    } 
+    }
     sodium_memzero(b_phi0, sizeof(b_phi0));
     sodium_memzero(v_b_phi0, sizeof(v_b_phi0));
     return 0;
 }
-
