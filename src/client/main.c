@@ -10,12 +10,12 @@
 int main(int argc, char *argv[])
 {
     if (sodium_init() == -1) {
-        LOG_ERROR("Unable to initialize sodium");
+        LOG_ERROR("Unable to initialize sodium, aborting...");
         return EXIT_FAILURE;
     }
 
     if (argc != 3) {
-        LOG_ERROR("Client requires an id and a password");
+        LOG_ERROR("Client requires an id and a password, aborting...");
         return EXIT_FAILURE;
     }
 
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 
     /*** SOCKET ***/
     if (socket < 0) {
-        LOG_ERROR("While getting the socket");
+        LOG_ERROR("While getting the socket, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     /*** ADDRESS ***/
     struct sockaddr_in address = nw_get_address();
     if (connect(socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        LOG_ERROR("Connection failed");
+        LOG_ERROR("Connection failed, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
     /*** CLIENT HELLO ***/
     if (client_send_hello_packet(client)) {
-        LOG_ERROR("While sending HELLO packet");
+        LOG_ERROR("While sending HELLO packet, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 
     // Sends phi0 and c to the server
     if (client_send_setup_packet(client)) {
-        LOG_ERROR("While sending SETUP packet");
+        LOG_ERROR("While sending SETUP packet, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
@@ -95,14 +95,14 @@ int main(int argc, char *argv[])
     client_compute_alpha(client);
 
     if (client_compute_u(client)) {
-        LOG_ERROR("While computing u");
+        LOG_ERROR("While computing u, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
 
     // Sends u to the server
     if (client_send_u_packet(client)) {
-        LOG_ERROR("While sending U packet");
+        LOG_ERROR("While sending U packet, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
@@ -129,13 +129,13 @@ int main(int argc, char *argv[])
     }
 
     if (client_compute_w_d(client)) {
-        LOG_ERROR("While computing w and d");
+        LOG_ERROR("While computing w and d, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
 
     if (client_compute_k(client)) {
-        LOG_ERROR("While computing k");
+        LOG_ERROR("While computing k, aborting...");
         result = EXIT_FAILURE;
         goto cleanup;
     }
