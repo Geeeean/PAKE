@@ -130,7 +130,6 @@ void test_a_and_b_generators(void) {
     generate_a_b_group_elements(a_2, b_2);
     TEST_ASSERT_TRUE(memcmp(a_1, a_2, 32) == 0);
     TEST_ASSERT_TRUE(memcmp(b_1, b_2, 32) == 0);
-    
 }
 
 void simple_protocol_correct(void)
@@ -179,6 +178,42 @@ void wrong_password_used(void) {
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
 }
 
+void wrong_id_used(void) {
+    unsigned char key_client[32];
+    unsigned char key_server[32];
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    run_setup((unsigned char *)"password123", (unsigned char *)"name",
+                               (unsigned char *)"server", phi0_s, c);
+    run_key_exchange((unsigned char *)"password1234", (unsigned char *)"name123",
+                               (unsigned char *)"server", phi0_s, c, key_client, key_server);
+    TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
+}
+
+void wrong_server_used(void) {
+    unsigned char key_client[32];
+    unsigned char key_server[32];
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    run_setup((unsigned char *)"password123", (unsigned char *)"name",
+                               (unsigned char *)"server", phi0_s, c);
+    run_key_exchange((unsigned char *)"password1234", (unsigned char *)"name",
+                               (unsigned char *)"server123", phi0_s, c, key_client, key_server);
+    TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
+}
+
+void name_and_server_switched_around(void) {
+    unsigned char key_client[32];
+    unsigned char key_server[32];
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    run_setup((unsigned char *)"password123", (unsigned char *)"name",
+                               (unsigned char *)"server", phi0_s, c);
+    run_key_exchange((unsigned char *)"password1234", (unsigned char *)"server",
+                               (unsigned char *)"name", phi0_s, c, key_client, key_server);
+    TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0); 
+}
+
 int main()
 {
     UNITY_BEGIN();
@@ -186,5 +221,8 @@ int main()
     RUN_TEST(simple_protocol_correct);
     RUN_TEST(protocol_doesnt_produce_same_keys_with_same_credentials);
     RUN_TEST(wrong_password_used);
+    RUN_TEST(wrong_id_used);
+    RUN_TEST(wrong_server_used);
+    RUN_TEST(name_and_server_switched_around);
     return UNITY_END();
 }
