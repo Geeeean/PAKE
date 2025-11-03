@@ -11,6 +11,15 @@ int main(int argc, char *argv[])
 {
     LOG_INFO("Server init...");
 
+    /*** Windows OS setup ***/
+    #ifdef _WIN32
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            LOG_ERROR("WSAStartup failed");
+            return 1;
+        }
+    #endif
+
     int result = 0;
     int listen_socket_fd = nw_get_socket();
 
@@ -77,6 +86,9 @@ int main(int argc, char *argv[])
     }
 
 cleanup:
+    #ifdef _WIN32
+        WSACleanup();
+    #endif
     close(listen_socket_fd);
     return result;
 }

@@ -4,6 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#endif
+
 #define PORT 3333
 
 int nw_get_socket()
@@ -28,7 +39,7 @@ int nw_set_socket_reuse(int socket)
     int opt = 1;
 
 #ifdef _WIN32
-    if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt,
+    if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt,
                    sizeof(opt))) {
 #else
     if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
@@ -36,13 +47,11 @@ int nw_set_socket_reuse(int socket)
         return 1;
     }
 
-#ifdef _WIN32
-    if (setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, (const char *)&opt, sizeof(opt))) {
-#else
+#ifndef _WIN32
     if (setsockopt(socket, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt))) {
-#endif
         return 2;
     }
+#endif
 
     return 0;
 }
@@ -84,24 +93,38 @@ ssize_t nw_send_packet(int socket, const Packet *packet)
 ssize_t nw_receive_packet(int socket, Packet *packet)
 {
     Header header;
-    if (recv(socket, (void *)&header, 3, MSG_WAITALL) != 3) {
-        LOG_ERROR("RECEIVE ERROR");
-        return -1;
+    size_t total = 0;
+    size_t header_size = 3;
+    uint8_t *hdr_ptr = (uint8_t *)&header;
+
+    // Receive header
+    while (total < header_size) {
+        int n = recv(socket, hdr_ptr + total, header_size - total, 0);
+        if (n <= 0) {
+            LOG_ERROR("RECEIVE ERROR (header)");
+            return -1;
+        }
+        total += n;
     }
+
     header.length = ntohs(header.length);
 
     uint8_t *payload = malloc(header.length);
-    if (!payload) {
-        return -1;
-    }
+    if (!payload) return -1;
 
-    if (recv(socket, payload, header.length, MSG_WAITALL) != header.length) {
-        free(payload);
-        return -1;
+    // Receive payload
+    total = 0;
+    while (total < header.length) {
+        int n = recv(socket, payload + total, header.length - total, 0);
+        if (n <= 0) {
+            free(payload);
+            LOG_ERROR("RECEIVE ERROR (payload)");
+            return -1;
+        }
+        total += n;
     }
 
     packet->header = header;
     packet->payload = payload;
-
     return header.length + sizeof(header);
 }

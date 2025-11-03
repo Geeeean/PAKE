@@ -9,6 +9,15 @@
 
 int main(int argc, char *argv[])
 {
+    /*** Windows OS setup ***/
+    #ifdef _WIN32
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            LOG_ERROR("WSAStartup failed");
+            return 1;
+        }
+    #endif
+
     if (sodium_init() == -1) {
         LOG_ERROR("Unable to initialize sodium, aborting...");
         return EXIT_FAILURE;
@@ -154,6 +163,9 @@ int main(int argc, char *argv[])
 
 cleanup:
     // TODO: free client
+    #ifdef _WIN32
+        WSACleanup();
+    #endif
     close(socket);
     return result;
 }
