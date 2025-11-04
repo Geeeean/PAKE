@@ -293,10 +293,6 @@ void integration_init(void)
     int listen_socket = nw_get_socket(UNIX);
     TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen_socket, "listen socket get");
 
-    int opt = 1;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, nw_set_socket_reuse(listen_socket),
-                                  "listen socket set reuse");
-
     struct sockaddr_un server_address;
     nw_get_address(UNIX, (struct sockaddr *)&server_address, server_id);
 
@@ -341,10 +337,6 @@ void integration_hello_handshake(void)
     /*** SERVER SOCKET CONFIG ***/
     int listen_socket = nw_get_socket(UNIX);
     TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen_socket, "listen socket get");
-
-    int opt = 1;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, nw_set_socket_reuse(listen_socket),
-                                  "listen socket set reuse");
 
     struct sockaddr_un server_address;
     nw_get_address(UNIX, (struct sockaddr *)&server_address, server_id);
