@@ -9,14 +9,14 @@
 
 int main(int argc, char *argv[])
 {
-    /*** Windows OS setup ***/
-    #ifdef _WIN32
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            LOG_ERROR("WSAStartup failed");
-            return 1;
-        }
-    #endif
+/*** Windows OS setup ***/
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        LOG_ERROR("WSAStartup failed");
+        return 1;
+    }
+#endif
 
     if (sodium_init() == -1) {
         LOG_ERROR("Unable to initialize sodium, aborting...");
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     }
 
     int result = EXIT_SUCCESS;
-    int socket = nw_get_socket();
+    int socket = nw_get_socket(TCP);
 
     /*** SOCKET ***/
     if (socket < 0) {
@@ -39,7 +39,8 @@ int main(int argc, char *argv[])
     }
 
     /*** ADDRESS ***/
-    struct sockaddr_in address = nw_get_address();
+    struct sockaddr_in address;
+    nw_get_address(TCP, (struct sockaddr *)&address, argv[1]);
     if (connect(socket, (struct sockaddr *)&address, sizeof(address)) < 0) {
         LOG_ERROR("Connection failed, aborting...");
         result = EXIT_FAILURE;
@@ -162,10 +163,10 @@ int main(int argc, char *argv[])
     LOG_INFO("%s", hex);
 
 cleanup:
-    // TODO: free client
-    #ifdef _WIN32
-        WSACleanup();
-    #endif
+// TODO: free client
+#ifdef _WIN32
+    WSACleanup();
+#endif
     close(socket);
     return result;
 }
