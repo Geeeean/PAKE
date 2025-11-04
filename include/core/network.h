@@ -13,8 +13,14 @@
 #include <sys/socket.h>
 #endif
 
-int nw_get_socket();
-struct sockaddr_in nw_get_address();
+typedef enum {
+    TCP,
+    UNIX,
+} SocketType;
+
+int nw_get_socket(SocketType socket_type);
+int nw_get_address(SocketType socket_type, struct sockaddr *address,
+                   const char *server_id);
 int nw_set_socket_reuse(int socket_fd);
 
 ssize_t nw_send_packet(int socket, const Packet *packet);

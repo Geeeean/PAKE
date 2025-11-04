@@ -10,28 +10,56 @@
 #pragma comment(lib, "Ws2_32.lib")
 #else
 #include <arpa/inet.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 #endif
 
 #define PORT 3333
+#define UNIX_SOCKET_PATH_PREFIX "/tmp/pake_server"
 
-int nw_get_socket()
+int nw_get_socket(SocketType socket_type)
 {
-    return socket(AF_INET, SOCK_STREAM, 0);
+    switch (socket_type) {
+    case TCP:
+        return socket(AF_INET, SOCK_STREAM, 0);
+    case UNIX:
+        return socket(AF_UNIX, SOCK_STREAM, 0);
+    default:
+        return -1;
+    }
 }
 
-struct sockaddr_in nw_get_address()
+int nw_get_address(SocketType socket_type, struct sockaddr *address,
+                   const char *server_id)
 {
-    struct sockaddr_in address;
-    memset(&address, 0, sizeof(address));
+    switch (socket_type) {
+    case TCP: {
+        struct sockaddr_in *address_in = (struct sockaddr_in *)address;
+        memset(address_in, 0, sizeof(struct sockaddr_in));
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    address.sin_port = htons(PORT);
+        address_in->sin_family = AF_INET;
+        address_in->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        address_in->sin_port = htons(PORT);
 
-    return address;
+        return 0;
+    }
+    case UNIX: {
+        struct sockaddr_un *address_un = (struct sockaddr_un *)address;
+        memset(address_un, 0, sizeof(struct sockaddr_un));
+
+        address_un->sun_family = AF_UNIX;
+        snprintf(address_un->sun_path, sizeof(address_un->sun_path),
+                 UNIX_SOCKET_PATH_PREFIX "%s.sock", server_id);
+
+        unlink(address_un->sun_path);
+
+        return 0;
+    }
+    default:
+        return -1;
+    }
 }
 
 int nw_set_socket_reuse(int socket)
@@ -39,8 +67,7 @@ int nw_set_socket_reuse(int socket)
     int opt = 1;
 
 #ifdef _WIN32
-    if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt,
-                   sizeof(opt))) {
+    if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt))) {
 #else
     if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
 #endif
@@ -110,7 +137,8 @@ ssize_t nw_receive_packet(int socket, Packet *packet)
     header.length = ntohs(header.length);
 
     uint8_t *payload = malloc(header.length);
-    if (!payload) return -1;
+    if (!payload)
+        return -1;
 
     // Receive payload
     total = 0;

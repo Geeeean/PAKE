@@ -11,17 +11,17 @@ int main(int argc, char *argv[])
 {
     LOG_INFO("Server init...");
 
-    /*** Windows OS setup ***/
-    #ifdef _WIN32
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            LOG_ERROR("WSAStartup failed");
-            return 1;
-        }
-    #endif
+/*** Windows OS setup ***/
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        LOG_ERROR("WSAStartup failed");
+        return 1;
+    }
+#endif
 
     int result = 0;
-    int listen_socket_fd = nw_get_socket();
+    int listen_socket_fd = nw_get_socket(TCP);
 
     if (argc != 2) {
         LOG_ERROR("Server requires an id");
@@ -46,7 +46,8 @@ int main(int argc, char *argv[])
     }
 
     /*** ADDRESS ***/
-    struct sockaddr_in address = nw_get_address();
+    struct sockaddr_in address;
+    nw_get_address(TCP, (struct sockaddr *)&address, argv[1]);
 
     /*** BINDING ***/
     if (bind(listen_socket_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
@@ -74,9 +75,9 @@ int main(int argc, char *argv[])
     server_loop(argv[1], listen_socket_fd);
 
 cleanup:
-    #ifdef _WIN32
-        WSACleanup();
-    #endif
+#ifdef _WIN32
+    WSACleanup();
+#endif
     close(listen_socket_fd);
     return result;
 }
