@@ -329,7 +329,68 @@ void integration_init(void)
     Server *server = server_init(server_id, new_socket);
     TEST_ASSERT_TRUE_MESSAGE(server, "server init");
 
-    storage_deinit();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, storage_deinit(), "storage deinit");
+}
+
+void integration_hello_handshake(void)
+{
+    char *server_id = "server_test";
+    char *client_id = "client_test";
+    char *client_password = "password_test";
+
+    /*** SERVER SOCKET CONFIG ***/
+    int listen_socket = nw_get_socket(UNIX);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen_socket, "listen socket get");
+
+    int opt = 1;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, nw_set_socket_reuse(listen_socket),
+                                  "listen socket set reuse");
+
+    struct sockaddr_un server_address;
+    nw_get_address(UNIX, (struct sockaddr *)&server_address, server_id);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(
+        0,
+        bind(listen_socket, (struct sockaddr *)&server_address, sizeof(server_address)),
+        "bind");
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen(listen_socket, 3), "listen");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, storage_init(server_id), "storage init");
+
+    /*** CLIENT SOCKET CONFIG ***/
+    int client_socket = nw_get_socket(UNIX);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, client_socket, "client socket get fail");
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0,
+                                             connect(client_socket,
+                                                     (struct sockaddr *)&server_address,
+                                                     sizeof(server_address)),
+                                             "client socket connect");
+
+    /*** SERVER CONNECTION ACCEPT ***/
+    struct sockaddr client_address;
+    socklen_t socklen = sizeof(client_address);
+    int new_socket = accept(listen_socket, (struct sockaddr *)&client_address, &socklen);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, new_socket, "accept");
+
+    Client *client = client_init(client_id, client_password, client_socket);
+    TEST_ASSERT_TRUE_MESSAGE(client, "client init");
+
+    Server *server = server_init(server_id, new_socket);
+    TEST_ASSERT_TRUE_MESSAGE(server, "server init");
+
+    /*** CLIENT HELLO SEND ***/
+    TEST_ASSERT_EQUAL_MESSAGE(0, client_send_hello_packet(client), "client hello");
+
+    /** SERVER HELLO RECEIVE + SEND ***/
+    TEST_ASSERT_EQUAL_MESSAGE(RR_SUCCESS, server_receive_hello_packet(server),
+                              "server hello receive");
+    TEST_ASSERT_EQUAL_MESSAGE(0, server_send_hello_packet(server), "client hello");
+
+    /*** CLIENT HELLO RECEIVE ***/
+    TEST_ASSERT_EQUAL_MESSAGE(RR_SUCCESS, client_receive_hello_packet(client),
+                              "server hello receive");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, storage_deinit(), "storage deinit");
 }
 
 int main()
@@ -354,6 +415,7 @@ int main()
 
     // Integration
     RUN_TEST(integration_init);
+    RUN_TEST(integration_hello_handshake);
 
     return UNITY_END();
 }
