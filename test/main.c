@@ -3,6 +3,10 @@
 #include <string.h>
 #include <unity.h>
 #include <utils.h>
+#include "server/storage.h"
+#include <sys/stat.h>
+
+#define STORAGE_PATH "./test_storage"
 
 void setUp(void)
 {
@@ -11,9 +15,14 @@ void setUp(void)
         LOG_ERROR("While sodiume init, aborting...");
         exit(EXIT_FAILURE);
     }
+    system("rm -rf " STORAGE_PATH);
+    mkdir(STORAGE_PATH, 0755);
+    setenv("STORAGE_PATH", STORAGE_PATH, 1);
 }
 
-void tearDown(void) {}
+void tearDown(void) {
+    system("rm -rf " STORAGE_PATH);
+}
 
 int run_setup(const unsigned char *password,
               const unsigned char *client_id,
@@ -214,15 +223,38 @@ void name_and_server_switched_around(void) {
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0); 
 }
 
+void storage_init_success(void) {
+    int result = storage_init("server123");
+    TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
+}
+
+void storage_store_and_verify_secret(void) {
+    storage_init("server123");
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    run_setup((unsigned char *)"password123", (unsigned char *)"name",
+                               (unsigned char *)"server123", phi0_s, c);
+    int result = storage_store_secret((unsigned char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
+
+    VerifyResult verify_result = storage_verify_secret("name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    TEST_ASSERT_EQUAL_INT(VR_SUCCESS, verify_result);
+}
+
 int main()
 {
     UNITY_BEGIN();
+    // Util test
     RUN_TEST(test_a_and_b_generators);
+    // Protocol
     RUN_TEST(simple_protocol_correct);
     RUN_TEST(protocol_doesnt_produce_same_keys_with_same_credentials);
     RUN_TEST(wrong_password_used);
     RUN_TEST(wrong_id_used);
     RUN_TEST(wrong_server_used);
     RUN_TEST(name_and_server_switched_around);
+    // Storage
+    RUN_TEST(storage_init_success);
+    RUN_TEST(storage_store_and_verify_secret);
     return UNITY_END();
 }
