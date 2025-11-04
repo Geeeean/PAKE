@@ -3,13 +3,8 @@
 
 typedef struct Server Server;
 
+#include "common.h"
 #include "server/storage.h"
-
-typedef enum {
-    RR_SUCCESS,
-    RR_FAILURE,
-    RR_TYPE_ERROR,
-} ReceiveResult;
 
 Server *server_init(const char *server_id, int socket);
 
@@ -38,6 +33,6 @@ int server_compute_k(Server *server);
 unsigned char *server_get_k(Server *server);
 uint64_t server_get_k_size(Server *server);
 
-void server_loop(const char* server_id, int listen_socket_fd);
+void server_loop(const char *server_id, int listen_socket_fd);
 
 #endif
