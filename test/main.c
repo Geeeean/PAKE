@@ -241,6 +241,35 @@ void storage_store_and_verify_secret(void) {
     TEST_ASSERT_EQUAL_INT(VR_SUCCESS, verify_result);
 }
 
+void storage_verify_secret_not_found(void) {
+    storage_init("server123");
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    crypto_core_ristretto255_random(phi0_s);
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    crypto_core_ristretto255_random(c);
+    VerifyResult verify_result = storage_verify_secret("jens", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    TEST_ASSERT_EQUAL_INT(VR_NOT_FOUND, verify_result);
+}
+
+void storage_store_and_verify_secret_wrong_credentials(void) {
+    storage_init("server123");
+    unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
+    unsigned char c[crypto_core_ristretto255_BYTES];
+    run_setup((unsigned char *)"password123", (unsigned char *)"name",
+                               (unsigned char *)"server123", phi0_s, c);
+    int result = storage_store_secret((unsigned char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
+
+    unsigned char phi0_wrong[crypto_core_ristretto255_SCALARBYTES];
+    crypto_core_ristretto255_random(phi0_wrong);
+    unsigned char c_wrong[crypto_core_ristretto255_BYTES];
+    crypto_core_ristretto255_random(c_wrong);
+
+    VerifyResult verify_result = storage_verify_secret("name", phi0_wrong, sizeof(phi0_wrong), c_wrong, sizeof(c_wrong));
+    TEST_ASSERT_EQUAL_INT(VR_NOT_VALID, verify_result);
+}
+
+
 int main()
 {
     UNITY_BEGIN();
@@ -256,5 +285,7 @@ int main()
     // Storage
     RUN_TEST(storage_init_success);
     RUN_TEST(storage_store_and_verify_secret);
+    RUN_TEST(storage_verify_secret_not_found);
+    RUN_TEST(storage_store_and_verify_secret_wrong_credentials);
     return UNITY_END();
 }
