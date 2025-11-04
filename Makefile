@@ -18,7 +18,7 @@ TEST_IFLAGS   = -I$(INCLUDEDIR) -I$(TESTDIR) $(CORE_IFLAGS) -I$(INCLUDEDIR)/$(SE
 
 CLIENT_SOURCES := $(wildcard $(SOURCEDIR)/$(CLIENT)/*.c) $(wildcard $(SOURCEDIR)/$(CORE)/*.c)
 SERVER_SOURCES := $(wildcard $(SOURCEDIR)/$(SERVER)/*.c) $(wildcard $(SOURCEDIR)/$(CORE)/*.c)
-TEST_SOURCES   := $(TESTDIR)/unity.c $(TESTDIR)/main.c $(wildcard $(SOURCEDIR)/$(CORE)/*.c) $(wildcard $(SOURCEDIR)/$(SERVER)/storage.c) 
+TEST_SOURCES   := $(TESTDIR)/unity.c $(TESTDIR)/main.c $(wildcard $(SOURCEDIR)/$(CORE)/*.c) $(SOURCEDIR)/$(SERVER)/server.c $(SOURCEDIR)/$(SERVER)/storage.c $(SOURCEDIR)/$(CLIENT)/client.c
 CLIENT_OBJS := $(patsubst $(SOURCEDIR)/%.c, $(BUILDDIR)/%.o, $(CLIENT_SOURCES))
 SERVER_OBJS := $(patsubst $(SOURCEDIR)/%.c, $(BUILDDIR)/%.o, $(SERVER_SOURCES))
 TEST_OBJS   := $(patsubst $(TESTDIR)/%.c, $(BUILDDIR)/$(TESTDIR)/%.o, $(TEST_SOURCES))

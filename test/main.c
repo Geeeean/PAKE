@@ -1,10 +1,14 @@
+#include "client/client.h"
 #include "log.h"
+#include "network.h"
+#include "server/server.h"
+#include "server/storage.h"
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/un.h>
 #include <unity.h>
 #include <utils.h>
-#include "server/storage.h"
-#include <sys/stat.h>
 
 #define STORAGE_PATH "./test_storage"
 
@@ -20,7 +24,8 @@ void setUp(void)
     setenv("STORAGE_PATH", STORAGE_PATH, 1);
 }
 
-void tearDown(void) {
+void tearDown(void)
+{
     system("rm -rf " STORAGE_PATH);
 }
 
@@ -122,7 +127,7 @@ int run_key_exchange(const unsigned char *password, const unsigned char *client_
     return 0;
 }
 
-void test_a_and_b_generators(void)
+void logic_test_a_and_b_generators(void)
 {
     unsigned char a_1[crypto_core_ristretto255_BYTES];
     unsigned char b_1[crypto_core_ristretto255_BYTES];
@@ -137,7 +142,7 @@ void test_a_and_b_generators(void)
     TEST_ASSERT_TRUE(memcmp(b_1, b_2, 32) == 0);
 }
 
-void simple_protocol_correct(void)
+void logic_simple_protocol_correct(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -171,7 +176,7 @@ void logic_protocol_doesnt_produce_same_keys_with_same_credentials(void)
     TEST_ASSERT_TRUE(memcmp(key_server_1, key_server_2, 32) != 0);
 }
 
-void wrong_password_used(void)
+void logic_wrong_password_used(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -184,7 +189,7 @@ void wrong_password_used(void)
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
 }
 
-void wrong_id_used(void)
+void logic_wrong_id_used(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -197,7 +202,7 @@ void wrong_id_used(void)
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
 }
 
-void wrong_server_used(void)
+void logic_wrong_server_used(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -210,7 +215,7 @@ void wrong_server_used(void)
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
 }
 
-void name_and_server_switched_around(void)
+void logic_name_and_server_switched_around(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -223,41 +228,49 @@ void name_and_server_switched_around(void)
     TEST_ASSERT_TRUE(memcmp(key_client, key_server, 32) != 0);
 }
 
-void storage_init_success(void) {
+void storage_init_success(void)
+{
     int result = storage_init("server123");
     TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
 }
 
-void storage_store_and_verify_secret(void) {
+void storage_store_and_verify_secret(void)
+{
     storage_init("server123");
     unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
     unsigned char c[crypto_core_ristretto255_BYTES];
     run_setup((unsigned char *)"password123", (unsigned char *)"name",
-                               (unsigned char *)"server123", phi0_s, c);
-    int result = storage_store_secret((unsigned char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+              (unsigned char *)"server123", phi0_s, c);
+    int result =
+        storage_store_secret((char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
     TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
 
-    VerifyResult verify_result = storage_verify_secret("name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    VerifyResult verify_result =
+        storage_verify_secret("name", phi0_s, sizeof(phi0_s), c, sizeof(c));
     TEST_ASSERT_EQUAL_INT(VR_SUCCESS, verify_result);
 }
 
-void storage_verify_secret_not_found(void) {
+void storage_verify_secret_not_found(void)
+{
     storage_init("server123");
     unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
     crypto_core_ristretto255_random(phi0_s);
     unsigned char c[crypto_core_ristretto255_BYTES];
     crypto_core_ristretto255_random(c);
-    VerifyResult verify_result = storage_verify_secret("jens", phi0_s, sizeof(phi0_s), c, sizeof(c));
+    VerifyResult verify_result =
+        storage_verify_secret("jens", phi0_s, sizeof(phi0_s), c, sizeof(c));
     TEST_ASSERT_EQUAL_INT(VR_NOT_FOUND, verify_result);
 }
 
-void storage_store_and_verify_secret_wrong_credentials(void) {
+void storage_store_and_verify_secret_wrong_credentials(void)
+{
     storage_init("server123");
     unsigned char phi0_s[crypto_core_ristretto255_SCALARBYTES];
     unsigned char c[crypto_core_ristretto255_BYTES];
     run_setup((unsigned char *)"password123", (unsigned char *)"name",
-                               (unsigned char *)"server123", phi0_s, c);
-    int result = storage_store_secret((unsigned char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
+              (unsigned char *)"server123", phi0_s, c);
+    int result =
+        storage_store_secret((char *)"name", phi0_s, sizeof(phi0_s), c, sizeof(c));
     TEST_ASSERT_EQUAL_INT(EXIT_SUCCESS, result);
 
     unsigned char phi0_wrong[crypto_core_ristretto255_SCALARBYTES];
@@ -265,27 +278,82 @@ void storage_store_and_verify_secret_wrong_credentials(void) {
     unsigned char c_wrong[crypto_core_ristretto255_BYTES];
     crypto_core_ristretto255_random(c_wrong);
 
-    VerifyResult verify_result = storage_verify_secret("name", phi0_wrong, sizeof(phi0_wrong), c_wrong, sizeof(c_wrong));
+    VerifyResult verify_result = storage_verify_secret(
+        "name", phi0_wrong, sizeof(phi0_wrong), c_wrong, sizeof(c_wrong));
     TEST_ASSERT_EQUAL_INT(VR_NOT_VALID, verify_result);
 }
 
+void integration_init(void)
+{
+    char *server_id = "server_test";
+    char *client_id = "client_test";
+    char *client_password = "password_test";
+
+    /*** SERVER SOCKET CONFIG ***/
+    int listen_socket = nw_get_socket(UNIX);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen_socket, "listen socket get");
+
+    int opt = 1;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, nw_set_socket_reuse(listen_socket),
+                                  "listen socket set reuse");
+
+    struct sockaddr_un server_address;
+    nw_get_address(UNIX, (struct sockaddr *)&server_address, server_id);
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(
+        0,
+        bind(listen_socket, (struct sockaddr *)&server_address, sizeof(server_address)),
+        "bind");
+
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, listen(listen_socket, 3), "listen");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, storage_init(server_id), "storage init");
+
+    /*** CLIENT SOCKET CONFIG ***/
+    int client_socket = nw_get_socket(UNIX);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, client_socket, "client socket get fail");
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0,
+                                             connect(client_socket,
+                                                     (struct sockaddr *)&server_address,
+                                                     sizeof(server_address)),
+                                             "client socket connect");
+
+    /*** SERVER CONNECTION ACCEPT ***/
+    struct sockaddr client_address;
+    socklen_t socklen = sizeof(client_address);
+    int new_socket = accept(listen_socket, (struct sockaddr *)&client_address, &socklen);
+    TEST_ASSERT_GREATER_OR_EQUAL_INT_MESSAGE(0, new_socket, "accept");
+
+    Client *client = client_init(client_id, client_password, client_socket);
+    TEST_ASSERT_TRUE_MESSAGE(client, "client init");
+
+    Server *server = server_init(server_id, new_socket);
+    TEST_ASSERT_TRUE_MESSAGE(server, "server init");
+
+    storage_deinit();
+}
 
 int main()
 {
     UNITY_BEGIN();
     // Util test
-    RUN_TEST(test_a_and_b_generators);
-    // Protocol
-    RUN_TEST(simple_protocol_correct);
+    RUN_TEST(logic_test_a_and_b_generators);
+
+    // Protocol (business logic)
+    RUN_TEST(logic_simple_protocol_correct);
     RUN_TEST(logic_protocol_doesnt_produce_same_keys_with_same_credentials);
-    RUN_TEST(wrong_password_used);
-    RUN_TEST(wrong_id_used);
-    RUN_TEST(wrong_server_used);
-    RUN_TEST(name_and_server_switched_around);
+    RUN_TEST(logic_wrong_password_used);
+    RUN_TEST(logic_wrong_id_used);
+    RUN_TEST(logic_wrong_server_used);
+    RUN_TEST(logic_name_and_server_switched_around);
+
     // Storage
     RUN_TEST(storage_init_success);
     RUN_TEST(storage_store_and_verify_secret);
     RUN_TEST(storage_verify_secret_not_found);
     RUN_TEST(storage_store_and_verify_secret_wrong_credentials);
+
+    // Integration
+    RUN_TEST(integration_init);
+
     return UNITY_END();
 }
