@@ -1,10 +1,12 @@
 #include "server/storage.h"
 #include "log.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define STORAGE_PATH "STORAGE_PATH"
 
@@ -38,8 +40,57 @@ int storage_init(const char *server_id)
     return EXIT_SUCCESS;
 }
 
-int storage_store_secret(const char *client_id, unsigned char *phi0, uint16_t phi0_len_out,
-                 unsigned char *c, uint16_t c_len_out)
+static int remove_directory_recursive(const char *path)
+{
+    DIR *dir = opendir(path);
+    if (!dir)
+        return -1;
+
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
+
+        struct stat st;
+        if (stat(full_path, &st) < 0)
+            return -1;
+
+        if (S_ISDIR(st.st_mode)) {
+            if (remove_directory_recursive(full_path) < 0)
+                return -1;
+        } else {
+            if (unlink(full_path) < 0)
+                return -1;
+        }
+    }
+
+    closedir(dir);
+
+    return rmdir(path);
+}
+
+int storage_deinit()
+{
+    if (!server_storage_path)
+        return EXIT_FAILURE;
+
+    if (remove_directory_recursive(server_storage_path) < 0) {
+        LOG_ERROR("Failed to delete storage directory");
+        return EXIT_FAILURE;
+    }
+
+    free(server_storage_path);
+    server_storage_path = NULL;
+
+    return EXIT_SUCCESS;
+}
+
+int storage_store_secret(const char *client_id, unsigned char *phi0,
+                         uint16_t phi0_len_out, unsigned char *c, uint16_t c_len_out)
 {
     char *client_path = NULL;
     FILE *file = NULL;
@@ -81,7 +132,8 @@ cleanup:
 }
 
 VerifyResult storage_verify_secret(const char *client_id, unsigned char *phi0,
-                           uint16_t phi0_len_out, unsigned char *c, uint16_t c_len_out)
+                                   uint16_t phi0_len_out, unsigned char *c,
+                                   uint16_t c_len_out)
 {
     char *client_path = NULL;
     FILE *file = NULL;
