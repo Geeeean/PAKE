@@ -1,6 +1,6 @@
 #include "log.h"
 #include "network.h"
-#include "server/client_handler.h"
+#include "server/server.h"
 #include "server/storage.h"
 
 #include <stdio.h>
@@ -62,19 +62,7 @@ int main(int argc, char *argv[])
 
     /*** MAIN LOOP ***/
     LOG_INFO("Server waiting for connections...");
-    while (1) {
-        struct sockaddr client_address;
-        socklen_t socklen = sizeof(client_address);
-        int new_socket =
-            accept(listen_socket_fd, (struct sockaddr *)&client_address, &socklen);
-
-        if (new_socket < 0) {
-            goto cleanup;
-        }
-
-        const Connection connection = {.socket = new_socket, .server_id = argv[1]};
-        handle_connection(connection);
-    }
+    server_loop(argv[1], listen_socket_fd);
 
 cleanup:
     close(listen_socket_fd);

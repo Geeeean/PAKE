@@ -100,7 +100,7 @@ int run_setup_and_key_exchange(const unsigned char *password,
     return 0;
 }
 
-void simple_protocol_correct(void)
+void logic_simple_protocol_correct(void)
 {
     unsigned char key_client[32];
     unsigned char key_server[32];
@@ -109,7 +109,7 @@ void simple_protocol_correct(void)
     TEST_ASSERT_EQUAL_UINT8_ARRAY(key_client, key_server, 32);
 }
 
-void protocol_doesnt_produce_same_keys(void)
+void logic_protocol_doesnt_produce_same_keys(void)
 {
     unsigned char key_client_1[32];
     unsigned char key_server_1[32];
@@ -124,10 +124,14 @@ void protocol_doesnt_produce_same_keys(void)
     TEST_ASSERT_TRUE(memcmp(key_server_1, key_server_2, 32) != 0);
 }
 
+void socket_instance_init(void) {
+
+}
+
 int main()
 {
     UNITY_BEGIN();
-    RUN_TEST(simple_protocol_correct);
-    RUN_TEST(protocol_doesnt_produce_same_keys);
+    RUN_TEST(logic_simple_protocol_correct);
+    RUN_TEST(logic_protocol_doesnt_produce_same_keys);
     return UNITY_END();
 }
