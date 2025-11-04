@@ -107,14 +107,13 @@ VerifyResult storage_verify_secret(const char *client_id, unsigned char *phi0,
     }
 
     uint16_t len;
-    unsigned char *buffer = malloc(len);
-
     // reading and comparing length of phi0
     fread(&len, sizeof(uint16_t), 1, file);
     if (len != phi0_len_out) {
         result = VR_NOT_VALID;
         goto cleanup;
     }
+    unsigned char *buffer = malloc(len);
 
     // reading and comparing phi0
     fread(buffer, 1, len, file);
