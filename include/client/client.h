@@ -27,4 +27,6 @@ int client_compute_k(Client *client);
 unsigned char *client_get_k(Client *client);
 uint64_t client_get_k_size(Client *client);
 
+void client_close(Client **client);
+
 #endif

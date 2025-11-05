@@ -1,14 +1,15 @@
 #include "client/client.h"
 #include "network.h"
+#include "unistd.h"
 #include "utils.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 struct Client {
-    const char *client_id;
-    const char *server_id;
-    const char *password;
+    char *client_id;
+    char *server_id;
+    char *password;
     int socket;
 
     // TODO: Our way of getting the public and fixed group elements a,b
@@ -54,12 +55,12 @@ Client *client_init(const char *client_id, const char *password, int socket)
         goto cleanup;
     }
 
-    client->client_id = (const char *)strdup(client_id);
+    client->client_id = strdup(client_id);
     if (!client->client_id) {
         goto cleanup;
     }
 
-    client->password = (const char *)strdup(password);
+    client->password = strdup(password);
     if (!client->password) {
         goto cleanup;
     }
@@ -78,16 +79,33 @@ cleanup:
     return NULL;
 }
 
+int client_send_close_packet(Client *client)
+{
+    int result = SUCCESS;
+
+    Packet packet = pt_initialize_packet(MSG_CLOSE);
+
+    if (nw_send_packet(client->socket, &packet) < 0) {
+        result = FAILURE;
+        goto cleanup;
+    }
+
+cleanup:
+    pt_free_packet_payload(&packet);
+
+    return result;
+}
+
 int client_send_hello_packet(Client *client)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet hello_packet = pt_initialize_packet(MSG_HELLO);
     hello_packet.payload =
         pt_build_hello_payload(client->client_id, &hello_packet.header.length);
 
     if (nw_send_packet(client->socket, &hello_packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
@@ -99,7 +117,7 @@ cleanup:
 
 int client_send_setup_packet(Client *client)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet setup_packet = pt_initialize_packet(MSG_SETUP);
     setup_packet.payload =
@@ -107,7 +125,7 @@ int client_send_setup_packet(Client *client)
                                sizeof(client->c), &setup_packet.header.length);
 
     if (nw_send_packet(client->socket, &setup_packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
@@ -118,20 +136,35 @@ cleanup:
 
 int client_send_u_packet(Client *client)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet u_packet = pt_initialize_packet(MSG_U);
     u_packet.payload =
         pt_build_u_payload(client->u, sizeof(client->u), &u_packet.header.length);
 
     if (nw_send_packet(client->socket, &u_packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
 cleanup:
     pt_free_packet_payload(&u_packet);
     return result;
+}
+
+ReceiveResult client_receive_close_packet(Client *client)
+{
+    Packet packet;
+
+    if (nw_receive_packet(client->socket, &packet) < 0) {
+        return RR_FAILURE;
+    }
+
+    if (packet.header.type != MSG_CLOSE) {
+        return RR_TYPE_ERROR;
+    }
+
+    return RR_SUCCESS;
 }
 
 ReceiveResult client_receive_hello_packet(Client *client)
@@ -178,14 +211,14 @@ int client_compute_group_elements(Client *client)
 int client_compute_phi(Client *client)
 {
     if (!client->password || !client->client_id || !client->server_id) {
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     H_function((const unsigned char *)client->password,
                (const unsigned char *)client->client_id,
                (const unsigned char *)client->server_id, client->phi0, client->phi1);
 
-    return EXIT_SUCCESS;
+    return SUCCESS;
 }
 
 int client_compute_c(Client *client)
@@ -205,17 +238,18 @@ int client_compute_u(Client *client)
 
 int client_compute_w_d(Client *client)
 {
-    return compute_w_d_values_for_client(client->alpha, client->b, client->v, client->phi0,
-                                  client->phi1, client->w, client->d);
+    return compute_w_d_values_for_client(client->alpha, client->b, client->v,
+                                         client->phi0, client->phi1, client->w,
+                                         client->d);
 }
 
 int client_compute_k(Client *client)
 {
-    return H_prime(client->phi0, sizeof(client->phi0), (const unsigned char *)client->client_id,
-            strlen(client->client_id), (const unsigned char *)client->server_id,
-            strlen(client->server_id), client->u, sizeof(client->u), client->v,
-            sizeof(client->v), client->w, sizeof(client->w), client->d, sizeof(client->d),
-            client->k);
+    return H_prime(client->phi0, sizeof(client->phi0),
+                   (const unsigned char *)client->client_id, strlen(client->client_id),
+                   (const unsigned char *)client->server_id, strlen(client->server_id),
+                   client->u, sizeof(client->u), client->v, sizeof(client->v), client->w,
+                   sizeof(client->w), client->d, sizeof(client->d), client->k);
 }
 
 unsigned char *client_get_k(Client *client)
@@ -226,4 +260,19 @@ unsigned char *client_get_k(Client *client)
 uint64_t client_get_k_size(Client *client)
 {
     return sizeof(client->k);
+}
+
+void client_close(Client **client)
+{
+    if (client) {
+        if (*client) {
+            free((*client)->client_id);
+            free((*client)->server_id);
+            free((*client)->password);
+            close((*client)->socket);
+            free(*client);
+
+            *client = NULL;
+        }
+    }
 }

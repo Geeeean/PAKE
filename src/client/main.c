@@ -163,10 +163,9 @@ int main(int argc, char *argv[])
     LOG_INFO("%s", hex);
 
 cleanup:
-// TODO: free client
 #ifdef _WIN32
     WSACleanup();
 #endif
-    close(socket);
+    client_close(&client);
     return result;
 }

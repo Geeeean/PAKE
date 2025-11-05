@@ -9,22 +9,20 @@
 #include "sodium.h"
 
 #include <ctype.h>
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <stdlib.h>
-#include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 
 struct Server {
-    const char *client_id;
-    const char *server_id;
+    char *client_id;
+    char *server_id;
     int socket;
 
     // TODO: Our way of getting the public and fixed group elements a,b
@@ -64,7 +62,7 @@ Server *server_init(const char *server_id, int socket)
         goto cleanup;
     }
 
-    server->server_id = (const char *)strdup(server_id);
+    server->server_id = strdup(server_id);
     if (!server->server_id) {
         goto cleanup;
     }
@@ -84,13 +82,13 @@ cleanup:
 
 int server_send_hello_packet(Server *server)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet packet = pt_initialize_packet(MSG_HELLO);
     packet.payload = pt_build_hello_payload(server->server_id, &packet.header.length);
 
     if (nw_send_packet(server->socket, &packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
@@ -102,12 +100,12 @@ cleanup:
 
 int server_send_close_packet(Server *server)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet packet = pt_initialize_packet(MSG_CLOSE);
 
     if (nw_send_packet(server->socket, &packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
@@ -119,14 +117,14 @@ cleanup:
 
 int server_send_v_packet(Server *server)
 {
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     Packet packet = pt_initialize_packet(MSG_V);
     packet.payload =
         pt_build_v_payload(server->v, sizeof(server->v), &packet.header.length);
 
     if (nw_send_packet(server->socket, &packet) < 0) {
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
@@ -134,6 +132,21 @@ cleanup:
     pt_free_packet_payload(&packet);
 
     return result;
+}
+
+ReceiveResult server_receive_close_packet(Server *server)
+{
+    Packet packet;
+
+    if (nw_receive_packet(server->socket, &packet) < 0) {
+        return RR_FAILURE;
+    }
+
+    if (packet.header.type != MSG_CLOSE) {
+        return RR_TYPE_ERROR;
+    }
+
+    return RR_SUCCESS;
 }
 
 ReceiveResult server_receive_hello_packet(Server *server)
@@ -274,7 +287,7 @@ int server_compute_d(Server *server)
 int server_compute_k(Server *server)
 {
     if (!server) {
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     return H_prime(server->phi0, sizeof(server->phi0),
@@ -292,6 +305,19 @@ unsigned char *server_get_k(Server *server)
 uint64_t server_get_k_size(Server *server)
 {
     return sizeof(server->k);
+}
+
+void server_close(Server **server)
+{
+    if (server) {
+        if (*server) {
+            free((*server)->server_id);
+            free((*server)->client_id);
+            close((*server)->socket);
+            free(*server);
+            *server = NULL;
+        }
+    }
 }
 
 static void *handle_client(void *args)
@@ -448,7 +474,7 @@ static void *handle_client(void *args)
     // free(c);
 
 cleanup:
-    // TODO: free server
+    server_close(&server);
     return NULL;
 }
 

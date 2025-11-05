@@ -1,4 +1,5 @@
 #include "server/storage.h"
+#include "common.h"
 #include "log.h"
 
 #include <dirent.h>
@@ -17,27 +18,27 @@ int storage_init(const char *server_id)
     const char *storage_path = getenv(STORAGE_PATH);
     if (storage_path == NULL) {
         LOG_ERROR("STORAGE_PATH is undefined");
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     int storage_dir = mkdir(storage_path, 0755);
     if (storage_dir < 0 && errno != EEXIST) {
         LOG_ERROR("Storage dir error");
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     if (asprintf(&server_storage_path, "%s/%s", storage_path, server_id) < 0) {
         LOG_ERROR("Server storage path error");
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     int server_storage_dir = mkdir(server_storage_path, 0755);
     if (server_storage_dir < 0 && errno != EEXIST) {
         LOG_ERROR("Server storage dir error");
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
-    return EXIT_SUCCESS;
+    return SUCCESS;
 }
 
 static int remove_directory_recursive(const char *path)
@@ -76,17 +77,17 @@ static int remove_directory_recursive(const char *path)
 int storage_deinit()
 {
     if (!server_storage_path)
-        return EXIT_FAILURE;
+        return FAILURE;
 
     if (remove_directory_recursive(server_storage_path) < 0) {
         LOG_ERROR("Failed to delete storage directory");
-        return EXIT_FAILURE;
+        return FAILURE;
     }
 
     free(server_storage_path);
     server_storage_path = NULL;
 
-    return EXIT_SUCCESS;
+    return SUCCESS;
 }
 
 int storage_store_secret(const char *client_id, unsigned char *phi0,
@@ -95,24 +96,24 @@ int storage_store_secret(const char *client_id, unsigned char *phi0,
     char *client_path = NULL;
     FILE *file = NULL;
 
-    int result = EXIT_SUCCESS;
+    int result = SUCCESS;
 
     if (!server_storage_path) {
         LOG_ERROR("Server storage path is NULL");
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
     if (asprintf(&client_path, "%s/%s", server_storage_path, client_id) < 0) {
         LOG_ERROR("Client secret file path error");
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 
     file = fopen(client_path, "w");
     if (!file) {
         LOG_ERROR("While opening secret file");
-        result = EXIT_FAILURE;
+        result = FAILURE;
         goto cleanup;
     }
 

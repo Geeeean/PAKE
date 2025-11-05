@@ -35,4 +35,6 @@ uint64_t server_get_k_size(Server *server);
 
 void server_loop(const char *server_id, int listen_socket_fd);
 
+void server_close(Server **server);
+
 #endif

@@ -20,7 +20,7 @@ typedef enum {
                //  sends v to C.
                // [ length (2B) ][ type (1B) ] | [ v (lengthB) ]
                //
-    MSG_CLOSE, // for closing connection (in case of error)
+    MSG_CLOSE, // for closing connection
 } MessageType;
 
 #pragma pack(push, 1)
