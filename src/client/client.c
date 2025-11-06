@@ -1,4 +1,5 @@
 #include "client/client.h"
+#include "log.h"
 #include "network.h"
 #include "unistd.h"
 #include "utils.h"
@@ -260,6 +261,112 @@ unsigned char *client_get_k(Client *client)
 uint64_t client_get_k_size(Client *client)
 {
     return sizeof(client->k);
+}
+
+int client_run(Client *client)
+{
+    int result = EXIT_SUCCESS;
+
+    /*** CLIENT HELLO ***/
+    if (client_send_hello_packet(client)) {
+        LOG_ERROR("While sending HELLO packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    LOG_INFO("HELLO packet sent");
+
+    switch (client_receive_hello_packet(client)) {
+    case RR_SUCCESS:
+        LOG_INFO("HELLO packet received");
+        break;
+    case RR_TYPE_ERROR:
+        LOG_ERROR("Expected HELLO packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+        break;
+    default:
+        LOG_ERROR("While receiving HELLO packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+        break;
+    }
+
+    /*** CLIENT PAKE ***/
+    if (client_compute_group_elements(client)) {
+        LOG_ERROR("While computing group elements, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_phi(client)) {
+        LOG_ERROR("While computing phi, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_c(client)) {
+        LOG_ERROR("While computing c, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    // Sends phi0 and c to the server
+    if (client_send_setup_packet(client)) {
+        LOG_ERROR("While sending SETUP packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    LOG_INFO("SETUP packet sent");
+
+    client_compute_alpha(client);
+
+    if (client_compute_u(client)) {
+        LOG_ERROR("While computing u, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    // Sends u to the server
+    if (client_send_u_packet(client)) {
+        LOG_ERROR("While sending U packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    LOG_INFO("U packet sent");
+
+    switch (client_receive_v_packet(client)) {
+    case RR_SUCCESS:
+        LOG_INFO("V packet received");
+        break;
+    case RR_TYPE_ERROR:
+        LOG_ERROR("Expected V packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+        break;
+    default:
+        LOG_ERROR("While receiving V packet, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+        break;
+    }
+
+    if (client_compute_w_d(client)) {
+        LOG_ERROR("While computing w and d, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+    if (client_compute_k(client)) {
+        LOG_ERROR("While computing k, aborting...");
+        result = EXIT_FAILURE;
+        goto cleanup;
+    }
+
+cleanup:
+    return result;
 }
 
 void client_close(Client **client)
