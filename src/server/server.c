@@ -53,7 +53,11 @@ Server *server_init(const char *server_id, int socket)
 {
     Server *server = NULL;
 
-    if (!server_id || socket < 0) {
+    if (!server_id) {
+        goto cleanup;
+    }
+
+    if (socket < 0) {
         goto cleanup;
     }
 
@@ -322,7 +326,7 @@ void server_close(Server **server)
 
 static void *handle_client(void *args)
 {
-    const Connection *connection = (const Connection *)&args;
+    Connection *connection = (Connection *)args;
     Server *server = server_init(connection->server_id, connection->socket);
 
     switch (server_receive_hello_packet(server)) {
@@ -478,7 +482,7 @@ cleanup:
     return NULL;
 }
 
-static void server_handle_connection(const Connection connection)
+static void server_handle_connection(Connection *connection)
 {
 #ifdef _WIN32
     // On Windows, create a thread with CreateThread
@@ -492,7 +496,7 @@ static void server_handle_connection(const Connection connection)
 #else
     // On Linux / macOS
     pthread_t thread;
-    pthread_create(&thread, NULL, handle_client, (void *)&connection);
+    pthread_create(&thread, NULL, handle_client, (void *)connection);
     pthread_detach(thread);
 #endif
 }
@@ -509,7 +513,11 @@ void server_loop(const char *server_id, int listen_socket)
             goto cleanup;
         }
 
-        const Connection connection = {.socket = new_socket, .server_id = server_id};
+        // Connection connection = {.socket = new_socket, .server_id = server_id};
+        Connection *connection = malloc(sizeof(Connection));
+        connection->socket = new_socket;
+        connection->server_id = server_id;
+
         server_handle_connection(connection);
     }
 
