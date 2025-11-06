@@ -520,17 +520,21 @@ static int server_handle_helper(const char *server_id, int listen_socket)
     return SUCCESS;
 }
 
-void server_loop(const char *server_id, int listen_socket, int max)
+int server_loop(const char *server_id, int listen_socket, int max)
 {
+    int result = EXIT_SUCCESS;
+
     if (max > 0) {
         while (1) {
             if (server_handle_helper(server_id, listen_socket)) {
+                result = EXIT_FAILURE;
                 goto cleanup;
             }
         }
     } else {
         for (int i = 0; i < max; i++) {
             if (server_handle_helper(server_id, listen_socket)) {
+                result = EXIT_FAILURE;
                 goto cleanup;
             }
         }
@@ -540,4 +544,5 @@ cleanup:;
     // todo
     // exit threads
     // server delete
+    return result;
 }

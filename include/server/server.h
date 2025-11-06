@@ -33,7 +33,7 @@ int server_compute_k(Server *server);
 unsigned char *server_get_k(Server *server);
 uint64_t server_get_k_size(Server *server);
 
-void server_loop(const char *server_id, int listen_socket_fd, int max);
+int server_loop(const char *server_id, int listen_socket_fd, int max);
 
 void server_close(Server **server);
 
