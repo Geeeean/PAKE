@@ -322,7 +322,7 @@ void server_close(Server **server)
 
 static void *handle_client(void *args)
 {
-    const Connection *connection = (const Connection *)args;
+    const Connection *connection = (const Connection *)&args;
     Server *server = server_init(connection->server_id, connection->socket);
 
     switch (server_receive_hello_packet(server)) {
