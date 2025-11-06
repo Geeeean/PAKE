@@ -501,24 +501,39 @@ static void server_handle_connection(Connection *connection)
 #endif
 }
 
-void server_loop(const char *server_id, int listen_socket)
+static int server_handle_helper(const char *server_id, int listen_socket)
 {
-    while (1) {
-        struct sockaddr client_address;
-        socklen_t socklen = sizeof(client_address);
-        int new_socket =
-            accept(listen_socket, (struct sockaddr *)&client_address, &socklen);
+    struct sockaddr client_address;
+    socklen_t socklen = sizeof(client_address);
+    int new_socket = accept(listen_socket, (struct sockaddr *)&client_address, &socklen);
 
-        if (new_socket < 0) {
-            goto cleanup;
+    if (new_socket < 0) {
+        return FAILURE;
+    }
+
+    Connection *connection = malloc(sizeof(Connection));
+    connection->socket = new_socket;
+    connection->server_id = server_id;
+
+    server_handle_connection(connection);
+
+    return SUCCESS;
+}
+
+void server_loop(const char *server_id, int listen_socket, int max)
+{
+    if (max > 0) {
+        while (1) {
+            if (server_handle_helper(server_id, listen_socket)) {
+                goto cleanup;
+            }
         }
-
-        // Connection connection = {.socket = new_socket, .server_id = server_id};
-        Connection *connection = malloc(sizeof(Connection));
-        connection->socket = new_socket;
-        connection->server_id = server_id;
-
-        server_handle_connection(connection);
+    } else {
+        for (int i = 0; i < max; i++) {
+            if (server_handle_helper(server_id, listen_socket)) {
+                goto cleanup;
+            }
+        }
     }
 
 cleanup:;

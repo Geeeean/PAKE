@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 
     /*** MAIN LOOP ***/
     LOG_INFO("Server waiting for connections...");
-    server_loop(argv[1], listen_socket_fd);
+    server_loop(argv[1], listen_socket_fd, 0);
 
 cleanup:
 #ifdef _WIN32
