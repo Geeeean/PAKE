@@ -497,7 +497,6 @@ static void server_handle_connection(Connection *connection)
     // On Linux / macOS
     pthread_t thread;
     pthread_create(&thread, NULL, handle_client, (void *)connection);
-    pthread_detach(thread);
 #endif
 }
 
@@ -525,14 +524,14 @@ int server_loop(const char *server_id, int listen_socket, int max)
     int result = EXIT_SUCCESS;
 
     if (max > 0) {
-        while (1) {
+        for (int i = 0; i < max; i++) {
             if (server_handle_helper(server_id, listen_socket)) {
                 result = EXIT_FAILURE;
                 goto cleanup;
             }
         }
     } else {
-        for (int i = 0; i < max; i++) {
+        while (1) {
             if (server_handle_helper(server_id, listen_socket)) {
                 result = EXIT_FAILURE;
                 goto cleanup;
@@ -544,5 +543,6 @@ cleanup:;
     // todo
     // exit threads
     // server delete
+    close(listen_socket);
     return result;
 }

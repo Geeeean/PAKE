@@ -1,6 +1,7 @@
 #include "client/client.h"
 #include "log.h"
 #include "network.h"
+#include "pthread.h"
 #include "server/server.h"
 #include "server/storage.h"
 #include <stdio.h>
@@ -12,6 +13,29 @@
 #include <utils.h>
 
 #define STORAGE_PATH "./test_storage"
+
+static int saved_stdout = -1;
+static int saved_stderr = -1;
+
+void mute_output(void)
+{
+    fflush(stdout);
+
+    saved_stdout = dup(STDOUT_FILENO);
+
+    freopen("/dev/null", "w", stdout);
+}
+
+void restore_output(void)
+{
+    fflush(stdout);
+
+    if (saved_stdout != -1) {
+        dup2(saved_stdout, STDOUT_FILENO);
+        close(saved_stdout);
+        saved_stdout = -1;
+    }
+}
 
 void setUp(void)
 {
@@ -330,10 +354,9 @@ void integration_init(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, storage_deinit(), "storage deinit");
 }
 
-int socket_setup(struct sockaddr_un *server_address, char *server_id, int *listen_socket,
-                 int *client_socket)
+int socket_setup(struct sockaddr_un *server_address, char *server_id, int *listen_socket)
 {
-    close(*listen_socket);
+    // close(*listen_socket);
 
     /*** SERVER SOCKET CONFIG ***/
     *listen_socket = nw_get_socket(UNIX);
@@ -347,17 +370,11 @@ int socket_setup(struct sockaddr_un *server_address, char *server_id, int *liste
         return FAILURE;
     }
 
-    if (listen(*listen_socket, 3) < 0) {
+    if (listen(*listen_socket, 100) < 0) {
         return FAILURE;
     }
 
     if (storage_init(server_id)) {
-        return FAILURE;
-    }
-
-    /*** CLIENT SOCKET CONFIG ***/
-    *client_socket = nw_get_socket(UNIX);
-    if (*client_socket < 0) {
         return FAILURE;
     }
 
@@ -392,8 +409,10 @@ void integration_hello_handshake(void)
     struct sockaddr_un server_address;
     int listen_socket, client_socket, new_socket;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -437,8 +456,10 @@ void integration_setup(void)
     struct sockaddr_un server_address;
     int listen_socket, client_socket, new_socket;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -497,8 +518,10 @@ void integration_setup_wrong_password(void)
     struct sockaddr_un server_address;
     int listen_socket, client_socket, new_socket;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -550,8 +573,10 @@ void integration_setup_wrong_password(void)
     char *client_wrong_password = "wrong_password_test";
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -613,8 +638,10 @@ void integration_setup_correct_password(void)
     struct sockaddr_un server_address;
     int listen_socket, client_socket, new_socket;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -664,8 +691,10 @@ void integration_setup_correct_password(void)
 
     /*** SAME SERVER, SAME CLIENT, SAME PASSWORD ***/
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -727,8 +756,10 @@ void integration_whole_protocol(void)
     struct sockaddr_un server_address;
     int listen_socket, client_socket, new_socket;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
-        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
         "socket setup");
+
+    client_socket = nw_get_socket(UNIX);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
                                   socket_connect(server_address, server_id,
@@ -823,6 +854,108 @@ void integration_whole_protocol(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, storage_deinit(), "storage deinit");
 }
 
+typedef struct {
+    const char *server_id;
+    int listen_socket;
+    int result;
+    int client_number;
+} ServerThread;
+
+void *server_thread_routine(void *args)
+{
+    ServerThread *server_thread = (ServerThread *)args;
+    server_thread->result =
+        (server_loop(server_thread->server_id, server_thread->listen_socket,
+                     server_thread->client_number));
+
+    return NULL;
+}
+
+typedef struct {
+    struct sockaddr_un *server_address;
+    char *client_id;
+    char *client_password;
+    int result;
+    pthread_t t;
+} ClientThread;
+
+void *client_thread_routine(void *args)
+{
+    ClientThread *client_thread = (ClientThread *)args;
+
+    int client_socket = nw_get_socket(UNIX);
+    if (connect(client_socket, (struct sockaddr *)client_thread->server_address,
+                sizeof(*client_thread->server_address))) {
+        client_thread->result = EXIT_FAILURE;
+        LOG_ERROR("Connection fail");
+        return NULL;
+    }
+
+    Client *client = client_init(client_thread->client_id, client_thread->client_password,
+                                 client_socket);
+    client_thread->result = client_run(client);
+
+    return NULL;
+}
+
+#define CLIENT_NUMBER 10
+
+void integration_multiple_client(void)
+{
+    mute_output();
+
+    char *server_id = "server_test";
+
+    char *clients[CLIENT_NUMBER][2] = {
+        [0] = {"c0", "pass0"}, [1] = {"c1", "pass1"}, [2] = {"c2", "pass2"},
+        [3] = {"c3", "pass3"}, [4] = {"c4", "pass4"}, [5] = {"c5", "pass5"},
+        [6] = {"c6", "pass6"}, [7] = {"c7", "pass7"}, [8] = {"c8", "pass8"},
+        [9] = {"c9", "pass9"},
+    };
+
+    struct sockaddr_un server_address;
+    int listen_socket;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket),
+        "socket setup");
+
+    ServerThread server_thread = {
+        .listen_socket = listen_socket,
+        .server_id = server_id,
+        .client_number = CLIENT_NUMBER,
+        .result = EXIT_FAILURE,
+    };
+
+    pthread_t t;
+    pthread_create(&t, NULL, server_thread_routine, (void *)&server_thread);
+
+    sleep(1);
+
+    ClientThread client_threads[CLIENT_NUMBER];
+
+    for (int i = 0; i < CLIENT_NUMBER; i++) {
+        client_threads[i].server_address = &server_address;
+        client_threads[i].client_id = clients[i][0];
+        client_threads[i].client_password = clients[i][1];
+        client_threads[i].result = EXIT_FAILURE;
+
+        pthread_create(&client_threads[i].t, NULL, client_thread_routine,
+                       (void *)&client_threads[i]);
+    }
+
+    for (int i = 0; i < CLIENT_NUMBER; i++) {
+        pthread_join(client_threads[i].t, NULL);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(EXIT_SUCCESS, client_threads[i].result,
+                                      "client thread");
+    }
+
+    pthread_join(t, NULL);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(EXIT_SUCCESS, server_thread.result, "server thread");
+
+    restore_output(); 
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, storage_deinit(), "storage deinit");
+}
+
 int main()
 {
     UNITY_BEGIN();
@@ -850,6 +983,7 @@ int main()
     RUN_TEST(integration_setup_wrong_password);
     RUN_TEST(integration_setup_correct_password);
     RUN_TEST(integration_whole_protocol);
+    RUN_TEST(integration_multiple_client);
 
     return UNITY_END();
 }
