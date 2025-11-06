@@ -119,9 +119,6 @@ int main(int argc, char *argv[])
 
     LOG_INFO("U packet sent");
 
-    // Receiving v
-    unsigned char v[crypto_core_ristretto255_BYTES];
-
     switch (client_receive_v_packet(client)) {
     case RR_SUCCESS:
         LOG_INFO("V packet received");

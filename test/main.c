@@ -718,6 +718,111 @@ void integration_setup_correct_password(void)
     TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, storage_deinit(), "storage deinit");
 }
 
+void integration_whole_protocol(void)
+{
+    char *server_id = "server_test";
+    char *client_id = "client_test";
+    char *client_password = "password_test";
+
+    struct sockaddr_un server_address;
+    int listen_socket, client_socket, new_socket;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+        SUCCESS, socket_setup(&server_address, server_id, &listen_socket, &client_socket),
+        "socket setup");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS,
+                                  socket_connect(server_address, server_id,
+                                                 &listen_socket, &client_socket,
+                                                 &new_socket),
+                                  "socket connect");
+
+    Client *client = client_init(client_id, client_password, client_socket);
+    TEST_ASSERT_TRUE_MESSAGE(client, "client init");
+
+    Server *server = server_init(server_id, new_socket);
+    TEST_ASSERT_TRUE_MESSAGE(server, "server init");
+
+    /*** CLIENT HELLO SEND ***/
+    TEST_ASSERT_EQUAL_MESSAGE(SUCCESS, client_send_hello_packet(client), "client hello");
+
+    /** SERVER HELLO RECEIVE + SEND ***/
+    TEST_ASSERT_EQUAL_MESSAGE(RR_SUCCESS, server_receive_hello_packet(server),
+                              "server hello receive");
+    TEST_ASSERT_EQUAL_MESSAGE(SUCCESS, server_send_hello_packet(server), "client hello");
+
+    /*** CLIENT HELLO RECEIVE ***/
+    TEST_ASSERT_EQUAL_MESSAGE(RR_SUCCESS, client_receive_hello_packet(client),
+                              "server hello receive");
+
+    /*** CLIENT PAKE ***/
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_group_elements(client),
+                                  "client compute group elements");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_phi(client),
+                                  "client compute phi");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_c(client), "client compute c");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_send_setup_packet(client),
+                                  "client send setup packet");
+
+    /*** SERVER RECEIVE SETUP ***/
+    TEST_ASSERT_EQUAL_INT_MESSAGE(RR_SUCCESS, server_receive_setup_packet(server),
+                                  "server receive setup packet");
+
+    VerifyResult verify_result = server_verify_secret(server);
+    TEST_ASSERT_TRUE_MESSAGE(verify_result == VR_NOT_FOUND, "secret");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_store_secret(server), "store secret");
+
+    /*** CLIENT U PACKET ***/
+    client_compute_alpha(client);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_u(client), "client compute u");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_send_u_packet(client),
+                                  "client send u packet");
+
+    /*** SERVER RECEIVE U AND SEND V AND COMPUTE K***/
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_group_elements(server),
+                                  "server compute group elements");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(RR_SUCCESS, server_receive_u_packet(server),
+                                  "server receive u packet");
+    server_compute_beta(server);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_g_beta(server),
+                                  "server_compute_g_beta");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_b_phi0(server),
+                                  "server_compute_b_phi0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_v(server), "server_compute_v");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_send_v_packet(server),
+                                  "server_send_v_packet");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_a_phi0(server),
+                                  "server_compute_a_phi0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_u_a_phi0(server),
+                                  "server_compute_u_a_phi0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_w(server), "server_compute_w");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_d(server), "server_compute_d");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, server_compute_k(server), "server_compute_k");
+
+    /*** CLIENT RECEIVE V AND COMPUTE K ***/
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_receive_v_packet(client),
+                                  "client_receive_v_packet");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_w_d(client),
+                                  "client_compute_w_d");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, client_compute_k(client), "client_compute_k");
+
+    unsigned char *client_key = client_get_k(client);
+    unsigned char *server_key = server_get_k(server);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(client_get_k_size(client), server_get_k_size(server),
+                                  "key size");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+        0, memcmp(client_key, server_key, client_get_k_size(client)), "same key");
+
+    server_close(&server);
+    TEST_ASSERT_TRUE_MESSAGE(!server, "server close");
+
+    client_close(&client);
+    TEST_ASSERT_TRUE_MESSAGE(!client, "client close");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(SUCCESS, storage_deinit(), "storage deinit");
+}
+
 int main()
 {
     UNITY_BEGIN();
@@ -744,6 +849,7 @@ int main()
     RUN_TEST(integration_setup);
     RUN_TEST(integration_setup_wrong_password);
     RUN_TEST(integration_setup_correct_password);
+    RUN_TEST(integration_whole_protocol);
 
     return UNITY_END();
 }
