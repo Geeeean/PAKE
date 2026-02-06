@@ -1,34 +1,70 @@
+# SPAKE2+ Implementation
 
-# 02232 Applied Cryptography PAKE [Group 24]
-**Tested on Ubuntu 24.04.2 LT**
+A secure implementation of the SPAKE2+ Password-Authenticated Key Exchange protocol using libsodium and Ristretto255.
+
+## Overview
+
+This project implements SPAKE2+, an augmented Password-Authenticated Key Exchange (PAKE) protocol that provides:
+
+- **Mutual Authentication**: Client and server verify each other without exposing passwords
+- **Forward Secrecy**: Session keys remain secure even if passwords are later compromised
+- **No Password Transmission**: Passwords never leave the client in plaintext
+- **Offline Attack Resistance**: Server stores only verifiers, not plaintext passwords
+
+## Features
+
+- Built on Ristretto255 prime-order group (eliminates cofactor-related vulnerabilities)
+- Constant-time cryptographic operations via libsodium
+- Multi-client support with concurrent thread handling
+- Comprehensive test suite covering protocol logic, storage, and integration
+- Clean separation between networking and cryptographic layers
 
 ## Requirements
+
+**Tested on Ubuntu 24.04.2 LTS**
+
 ```bash
-sudo apt install build-essential
-sudo apt install libsodium-dev
+sudo apt install build-essential libsodium-dev
 ```
 
-## Compiling
+## Building
+
 ```bash
 make
 ```
 
 ## Usage
-Starting a server
+
+### Starting the Server
+
 ```bash
-STORAGE_PATH=path  ./bin/server serverid
-```
-Starting a client
-```bash
-./bin/client clientid password
+STORAGE_PATH=/path/to/storage ./bin/server <server_id>
 ```
 
+The server will:
+- Listen for incoming client connections
+- Store client verifiers (not plaintext passwords)
+- Handle multiple clients concurrently
+
+### Starting a Client
+
+```bash
+./bin/client <client_id> <password>
+```
+
+On first connection, the client will register with the server. On subsequent connections, it will authenticate and establish a shared session key.
+
 ## Testing
+
+Run the complete test suite:
+
 ```bash
 make test
 ```
-Example output:
-```bash
+
+### Expected Output
+
+```
 test/main.c:963:logic_test_a_and_b_generators:PASS
 test/main.c:966:logic_simple_protocol_correct:PASS
 test/main.c:967:logic_protocol_doesnt_produce_same_keys_with_same_credentials:PASS
@@ -51,7 +87,46 @@ test/main.c:986:integration_multiple_client:PASS
 18 Tests 0 Failures 0 Ignored
 OK
 ```
-The output from the unit testing will display whether it has **PASSED** or **FAILED.** If everything has been compiled correctly, the tests should run without errors and display at the bottom **0 FAILURES.**
 
+### Test Coverage
 
+The test suite includes three layers:
 
+1. **Protocol Logic Tests**: Verify cryptographic correctness and key derivation
+2. **Storage Tests**: Validate verifier persistence and credential matching
+3. **Integration Tests**: Test complete client-server workflows including concurrent connections
+
+## Protocol Details
+
+### Setup Phase (Registration)
+
+1. Client computes password-derived scalars: `(φ₀, φ₁) = H(password || clientID || serverID)`
+2. Client computes verifier: `c = g^φ₁`
+3. Client sends verifier `(φ₀, c)` to server (password never transmitted)
+
+### Key Exchange Phase (Authentication)
+
+1. Client generates ephemeral key `α` and sends `u = g^α · a^φ₀`
+2. Server generates ephemeral key `β` and sends `v = g^β · b^φ₀`
+3. Both parties compute shared values `w` and `d`
+4. Session key derived as: `k = H'(φ₀ || clientID || serverID || u || v || w || d)`
+
+Keys match only if both parties use identical credentials.
+
+## Security Considerations
+
+- Uses audited libsodium primitives for all cryptographic operations
+- Sensitive memory explicitly zeroed after use via `sodium_memzero()`
+- Hash functions provide domain separation (H for scalars, H' for keys)
+- Ristretto255 ensures prime-order group without subgroup attacks
+- Fresh ephemeral keys per session provide forward secrecy
+
+## References
+
+- [RFC 9383: SPAKE2+ Protocol Specification](https://www.rfc-editor.org/rfc/rfc9383)
+- [Ristretto Group Construction](https://ristretto.group/)
+- [libsodium Documentation](https://doc.libsodium.org/)
+
+## License
+
+Applied Cryptography course project (02232)
